@@ -527,10 +527,15 @@ body {
       </div>
     </div>
 
-    <!-- Export -->
-    <div class="btn-row">
-      <button class="btn btn-ghost" onclick="exportCSV('wagon')">⬇ Export CSV (wagon)</button>
-      <button class="btn btn-ghost btn-sm" style="flex:0;white-space:nowrap" onclick="exportCSV('all')">Tout</button>
+    <!-- Export + Partage -->
+    <div style="display:flex;flex-direction:column;gap:8px;margin-top:4px">
+      <button class="btn btn-amber" onclick="shareCSV('wagon')">
+        <span>↗</span><span>Envoyer par mail (ce wagon)</span>
+      </button>
+      <div class="btn-row" style="margin-top:0">
+        <button class="btn btn-ghost" onclick="exportCSV('wagon')">⬇ Télécharger CSV</button>
+        <button class="btn btn-ghost btn-sm" style="flex:0;white-space:nowrap;padding:0 14px" onclick="shareCSV('all')">↗ Tout envoyer</button>
+      </div>
     </div>
 
     <!-- Historique de ce wagon -->
@@ -560,7 +565,10 @@ body {
       <div style="font-family:var(--fd);font-size:1.4rem;font-weight:800">Tous les contrôles</div>
       <button class="btn btn-danger btn-sm" onclick="clearAll()">🗑 Tout effacer</button>
     </div>
-    <button class="btn btn-ghost mb" onclick="exportCSV('all')">⬇ Export CSV complet</button>
+    <div class="btn-row mb">
+      <button class="btn btn-amber" onclick="shareCSV('all')">↗ Envoyer par mail</button>
+      <button class="btn btn-ghost btn-sm" style="flex:0;white-space:nowrap;padding:0 14px" onclick="exportCSV('all')">⬇ Télécharger</button>
+    </div>
     <div id="hist-list"></div>
   </div>
 </div>
@@ -957,10 +965,11 @@ function clearAll() {
   showScreen('s-wagon');
 }
 
-/* ── EXPORT CSV ─────────────────────────────────────────── */
-function exportCSV(mode) {
+/* ── EXPORT & PARTAGE CSV ───────────────────────────────── */
+
+function buildCSV(mode) {
   const rows = mode === 'wagon' ? getByWagon(state.wagon) : loadDB();
-  if (!rows.length) { toast('Aucune donnée à exporter', 'error'); return; }
+  if (!rows.length) return null;
 
   const header = 'wagon,essieu_index,numero_serie,type,tonnage,detenteur,date_revision,atelier,date_enregistrement\n';
   const csv = rows.map(r =>
@@ -969,18 +978,89 @@ function exportCSV(mode) {
      `"${r.atelier||''}"`, `"${r.created_at}"`].join(',')
   ).join('\n');
 
-  const blob = new Blob(['\uFEFF' + header + csv], { type: 'text/csv;charset=utf-8;' });
-  const url  = URL.createObjectURL(blob);
-  const a    = document.createElement('a');
-  const name = mode === 'wagon'
+  const filename = mode === 'wagon'
     ? `controle_${state.wagon.replace(/\s/g,'_')}.csv`
     : `controles_wagons_${new Date().toISOString().slice(0,10)}.csv`;
 
-  a.href = url; a.download = name;
+  const blob = new Blob(['\uFEFF' + header + csv], { type: 'text/csv;charset=utf-8;' });
+  return { blob, filename, rows };
+}
+
+// Téléchargement direct (comportement précédent)
+function exportCSV(mode) {
+  const result = buildCSV(mode);
+  if (!result) { toast('Aucune donnée à exporter', 'error'); return; }
+  const { blob, filename } = result;
+
+  const url = URL.createObjectURL(blob);
+  const a   = document.createElement('a');
+  a.href = url; a.download = filename;
   document.body.appendChild(a); a.click();
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
-  toast(`CSV exporté : ${name}`, 'success');
+  toast(`CSV téléchargé : ${filename}`, 'success');
+}
+
+// Partage natif Android (mail, WhatsApp, Drive…)
+async function shareCSV(mode) {
+  const result = buildCSV(mode);
+  if (!result) { toast('Aucune donnée à exporter', 'error'); return; }
+  const { blob, filename, rows } = result;
+
+  const file = new File([blob], filename, { type: 'text/csv' });
+
+  // Web Share API niveau 2 — partage de fichier natif
+  if (navigator.canShare && navigator.canShare({ files: [file] })) {
+    try {
+      await navigator.share({
+        title:  'WagonCtrl — Export contrôle',
+        text:   mode === 'wagon'
+          ? `Contrôle wagon ${state.wagon} — ${rows.length} essieu(x)`
+          : `Export complet WagonCtrl — ${rows.length} enregistrement(s)`,
+        files:  [file],
+      });
+      toast('Fichier partagé ✓', 'success');
+    } catch(err) {
+      if (err.name !== 'AbortError') {
+        // Partage fichier refusé → fallback texte
+        shareAsText(mode, rows);
+      }
+    }
+    return;
+  }
+
+  // Fallback : Web Share API niveau 1 (texte seulement, sans fichier)
+  if (navigator.share) {
+    shareAsText(mode, rows);
+    return;
+  }
+
+  // Dernier fallback : téléchargement classique
+  toast('Partage non supporté — téléchargement du fichier', 'info');
+  exportCSV(mode);
+}
+
+// Fallback : ouvre l'app mail avec le CSV dans le corps du message
+function shareAsText(mode, rows) {
+  const header  = 'wagon;essieu_index;numero_serie;type;tonnage;detenteur;date_revision;atelier\n';
+  const content = rows.map(r =>
+    [r.wagon, r.essieu_index, r.sn||'', r.type||'',
+     r.tonnage||'', r.detenteur||'', r.date_revision||'', r.atelier||''].join(';')
+  ).join('\n');
+
+  const subject = mode === 'wagon'
+    ? `Contrôle wagon ${state.wagon}`
+    : `Export WagonCtrl ${new Date().toLocaleDateString('fr-FR')}`;
+
+  const body = `Bonjour,\n\nVeuillez trouver ci-dessous les données de contrôle :\n\n${header}${content}\n\nEnvoyé depuis WagonCtrl`;
+
+  navigator.share({
+    title: subject,
+    text:  body,
+  }).catch(() => {
+    // Si même ça échoue, on télécharge
+    exportCSV(mode);
+  });
 }
 
 /* ── NEW CONTROL ────────────────────────────────────────── */
