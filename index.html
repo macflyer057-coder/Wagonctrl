@@ -1,0 +1,1017 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover"/>
+<meta name="theme-color" content="#080d1a"/>
+<meta name="apple-mobile-web-app-capable" content="yes"/>
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+<meta name="apple-mobile-web-app-title" content="WagonCtrl"/>
+<title>WagonCtrl</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@400;600;700;800;900&family=Barlow:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+
+<style>
+/* ═══════════════════════════════════════════════════════════
+   DESIGN SYSTEM — WAGON CTRL
+   Esthétique : industriel haute précision, nuit profonde,
+   accent ambre-chaud, typographie condensée technique
+═══════════════════════════════════════════════════════════ */
+:root {
+  --bg-0: #04080f;
+  --bg-1: #080d1a;
+  --bg-2: #0c1225;
+  --bg-3: #10182e;
+  --bg-4: #152038;
+
+  --amber:      #f0a500;
+  --amber-dim:  #b87d00;
+  --amber-glow: rgba(240,165,0,0.15);
+  --amber-line: rgba(240,165,0,0.3);
+
+  --green:      #1fd97a;
+  --green-dim:  rgba(31,217,122,0.12);
+  --red:        #f04545;
+  --red-dim:    rgba(240,69,69,0.12);
+
+  --t1: #dce8f8;
+  --t2: #7a90b8;
+  --t3: #3d5070;
+  --t4: #1e2d48;
+
+  --border:     rgba(255,255,255,0.055);
+  --border-hi:  rgba(240,165,0,0.5);
+
+  --r1: 8px;
+  --r2: 14px;
+  --r3: 20px;
+
+  --fd: 'Barlow Condensed', sans-serif;
+  --fb: 'Barlow', sans-serif;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+html { height: 100%; background: var(--bg-0); }
+body {
+  min-height: 100vh;
+  min-height: -webkit-fill-available;
+  background: var(--bg-1);
+  color: var(--t1);
+  font-family: var(--fb);
+  -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+}
+
+/* ── SCREENS ── */
+.screen {
+  display: none;
+  flex-direction: column;
+  min-height: 100vh;
+  min-height: -webkit-fill-available;
+  animation: fadeUp .28s ease-out;
+}
+.screen.active { display: flex; }
+
+@keyframes fadeUp {
+  from { opacity:0; transform:translateY(10px); }
+  to   { opacity:1; transform:translateY(0); }
+}
+
+/* ── TOPBAR ── */
+.topbar {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 14px 18px 12px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-1);
+  position: sticky; top: 0; z-index: 50;
+  backdrop-filter: blur(12px);
+}
+.topbar-logo {
+  font-family: var(--fd); font-size: 1.35rem; font-weight: 900;
+  letter-spacing: .06em; color: var(--amber); text-transform: uppercase;
+}
+.topbar-logo em { color: var(--t3); font-style: normal; font-weight: 400; }
+.topbar-tag {
+  font-family: var(--fd); font-size: .68rem; font-weight: 700;
+  letter-spacing: .12em; text-transform: uppercase;
+  color: var(--t3); background: var(--bg-3);
+  border: 1px solid var(--border); border-radius: 999px;
+  padding: 4px 12px;
+}
+.topbar-back {
+  background: none; border: none; color: var(--t2);
+  font-family: var(--fd); font-size: .9rem; cursor: pointer;
+  display: flex; align-items: center; gap: 5px; padding: 0;
+  letter-spacing: .04em;
+}
+
+/* ── SCROLL ZONE ── */
+.zone {
+  flex: 1; overflow-y: auto; padding: 22px 18px 40px;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* ── LABELS ── */
+.lbl {
+  font-family: var(--fd); font-size: .65rem; font-weight: 700;
+  letter-spacing: .12em; text-transform: uppercase; color: var(--t3);
+  display: flex; align-items: center; gap: 8px; margin-bottom: 8px;
+}
+.lbl::after { content:''; flex:1; height:1px; background:var(--border); }
+
+/* ── CARDS ── */
+.card {
+  background: var(--bg-2); border: 1px solid var(--border);
+  border-radius: var(--r2); padding: 16px; margin-bottom: 12px;
+  box-shadow: 0 4px 20px rgba(0,0,0,.4);
+}
+.card-amber {
+  border-color: var(--amber-line);
+  background: linear-gradient(135deg, var(--bg-2), rgba(240,165,0,.04));
+}
+
+/* ── INPUTS ── */
+.inp {
+  width: 100%; background: var(--bg-0); border: 1.5px solid var(--border);
+  border-radius: var(--r1); padding: 13px 14px;
+  color: var(--t1); font-family: var(--fd); font-size: 1.1rem;
+  font-weight: 700; letter-spacing: .04em;
+  outline: none; transition: border-color .18s, box-shadow .18s;
+  -webkit-appearance: none;
+}
+.inp::placeholder { color: var(--t3); font-weight: 400; }
+.inp:focus { border-color: var(--border-hi); box-shadow: 0 0 0 3px var(--amber-glow); }
+.inp.ok  { border-color: rgba(31,217,122,.5); }
+.inp.err { border-color: rgba(240,69,69,.6); }
+
+.sel {
+  width: 100%; background: var(--bg-0); border: 1.5px solid var(--border);
+  border-radius: var(--r1); padding: 13px 38px 13px 14px;
+  color: var(--t1); font-family: var(--fd); font-size: 1.05rem; font-weight: 600;
+  -webkit-appearance: none; appearance: none; outline: none; cursor: pointer;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%233d5070' stroke-width='1.8' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat; background-position: right 14px center;
+  transition: border-color .18s;
+}
+.sel:focus { border-color: var(--border-hi); box-shadow: 0 0 0 3px var(--amber-glow); }
+.sel option { background: var(--bg-3); }
+
+.hint { font-size: .73rem; color: var(--t3); margin-top: 5px; }
+.errtxt { font-size: .73rem; color: var(--red); margin-top: 5px; font-weight: 600; }
+.oktxt  { font-size: .73rem; color: var(--green); margin-top: 5px; font-weight: 600; }
+
+/* ── BUTTONS ── */
+.btn {
+  width: 100%; border: none; border-radius: var(--r1);
+  padding: 14px 20px; font-family: var(--fd); font-size: 1rem;
+  font-weight: 800; letter-spacing: .1em; text-transform: uppercase;
+  cursor: pointer; display: flex; align-items: center; justify-content: center;
+  gap: 8px; transition: all .16s ease;
+  -webkit-tap-highlight-color: transparent; touch-action: manipulation;
+  text-decoration: none;
+}
+.btn:active { transform: scale(.97); }
+.btn:disabled { opacity: .35; cursor: not-allowed; transform: none; }
+
+.btn-amber {
+  background: var(--amber); color: #04080f;
+  box-shadow: 0 4px 22px rgba(240,165,0,.28);
+}
+.btn-amber:hover:not(:disabled) { background: #f5b420; }
+
+.btn-ghost {
+  background: var(--bg-3); color: var(--t2);
+  border: 1px solid var(--border);
+}
+.btn-ghost:hover:not(:disabled) { background: var(--bg-4); }
+
+.btn-danger {
+  background: var(--red-dim); color: var(--red);
+  border: 1px solid rgba(240,69,69,.25);
+}
+
+.btn-sm { width:auto; padding: 8px 14px; font-size:.75rem; }
+
+.btn-row { display:flex; gap:10px; margin-top:14px; }
+.btn-row .btn { flex:1; }
+
+/* ── PROGRESS ── */
+.prog-wrap { background:var(--bg-3); border-radius:999px; height:5px; overflow:hidden; }
+.prog-fill {
+  height:100%; border-radius:999px;
+  background: linear-gradient(90deg, var(--amber-dim), var(--amber));
+  transition: width .45s cubic-bezier(.4,0,.2,1);
+  box-shadow: 0 0 10px var(--amber-glow);
+}
+.prog-labels {
+  display:flex; justify-content:space-between;
+  font-size:.7rem; color:var(--t3); font-family:var(--fd);
+  letter-spacing:.05em; margin-top:4px;
+}
+
+/* ── BADGES ── */
+.badge {
+  display:inline-flex; align-items:center; gap:5px;
+  padding: 3px 10px; border-radius:999px;
+  font-family:var(--fd); font-size:.65rem; font-weight:700;
+  letter-spacing:.1em; text-transform:uppercase;
+}
+.badge-green { background:var(--green-dim); color:var(--green); border:1px solid rgba(31,217,122,.2); }
+.badge-amber { background:var(--amber-glow); color:var(--amber); border:1px solid var(--amber-line); }
+.badge-red   { background:var(--red-dim); color:var(--red); border:1px solid rgba(240,69,69,.2); }
+
+/* ── DATA GRID ── */
+.dgrid { display:grid; grid-template-columns:1fr 1fr; gap:7px; }
+.dcell {
+  background:var(--bg-3); border:1px solid var(--border);
+  border-radius:var(--r1); padding: 9px 11px;
+}
+.dcell-lbl {
+  font-family:var(--fd); font-size:.6rem; font-weight:700;
+  letter-spacing:.1em; text-transform:uppercase; color:var(--t3); margin-bottom:3px;
+}
+.dcell-val {
+  font-family:var(--fd); font-size:1rem; font-weight:800;
+  color:var(--t1); white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+}
+
+/* ── WAGON TAG ── */
+.wagon-num {
+  font-family:var(--fd); font-size:1.65rem; font-weight:900;
+  letter-spacing:.06em; color:var(--amber); line-height:1;
+}
+
+/* ── HISTORY ITEMS ── */
+.hist-item {
+  background:var(--bg-2); border:1px solid var(--border);
+  border-radius:var(--r2); padding:13px 14px; margin-bottom:8px;
+  transition:border-color .2s;
+}
+.hist-item:active { border-color:var(--amber-line); }
+
+/* ── SUCCESS ── */
+.success-ring {
+  width:76px; height:76px; border-radius:50%;
+  background:var(--green-dim); border:2px solid var(--green);
+  display:flex; align-items:center; justify-content:center;
+  margin:0 auto 20px;
+  animation:popIn .45s cubic-bezier(.34,1.56,.64,1);
+}
+@keyframes popIn {
+  from { transform:scale(0); opacity:0; }
+  to   { transform:scale(1); opacity:1; }
+}
+
+/* ── TOAST ── */
+#toast {
+  position:fixed; bottom:24px; left:16px; right:16px;
+  background:var(--bg-4); border:1px solid var(--border);
+  border-radius:var(--r2); padding:13px 16px;
+  display:none; align-items:center; gap:10px;
+  box-shadow:0 8px 32px rgba(0,0,0,.6);
+  animation:toastIn .3s cubic-bezier(.34,1.56,.64,1);
+  z-index:999; font-size:.88rem;
+}
+#toast.show { display:flex; }
+@keyframes toastIn {
+  from { transform:translateY(18px); opacity:0; }
+  to   { transform:translateY(0); opacity:1; }
+}
+
+/* ── SPINNER ── */
+.spin {
+  width:18px; height:18px; border-radius:50%;
+  border:2px solid rgba(0,0,0,.15); border-top-color:#000;
+  animation:spin .7s linear infinite; flex-shrink:0;
+}
+@keyframes spin { to { transform:rotate(360deg); } }
+
+/* ── MISC ── */
+.divider { height:1px; background:var(--border); margin:18px 0; }
+.mt { margin-top:14px; }
+.mb { margin-bottom:10px; }
+.field-group { margin-bottom:14px; }
+.empty { text-align:center; padding:40px 20px; color:var(--t3); }
+.empty-icon { font-size:2.2rem; margin-bottom:10px; opacity:.35; }
+::-webkit-scrollbar { width:2px; }
+::-webkit-scrollbar-thumb { background:var(--t4); }
+</style>
+</head>
+<body>
+
+<!-- ═══════════════════════════════════════════════
+     ÉCRAN 1 — IDENTIFICATION WAGON
+═══════════════════════════════════════════════ -->
+<div class="screen active" id="s-wagon">
+  <div class="topbar">
+    <div class="topbar-logo">Wagon<em>Ctrl</em></div>
+    <span class="topbar-tag">Identification</span>
+  </div>
+  <div class="zone">
+
+    <div style="margin-bottom:28px">
+      <div style="font-family:var(--fd);font-size:2.3rem;font-weight:900;line-height:1.05;letter-spacing:-.01em;margin-bottom:8px">
+        Nouveau<br><span style="color:var(--amber)">Contrôle</span>
+      </div>
+      <div style="color:var(--t2);font-size:.88rem">
+        Identifiez le wagon et définissez le nombre d'essieux avant de scanner.
+      </div>
+    </div>
+
+    <!-- N° wagon -->
+    <div class="card card-amber">
+      <p class="lbl">Wagon</p>
+      <div class="field-group">
+        <label class="lbl" style="font-size:.6rem;margin-bottom:6px">N° de wagon</label>
+        <input class="inp" id="inp-wagon" type="text"
+          placeholder="33 87 4935 002-7" maxlength="17"
+          autocomplete="off" autocorrect="off" spellcheck="false"
+          inputmode="numeric" oninput="onWagonInput(this)"/>
+        <div id="wagon-feedback" class="hint">Format : xx xx xxxx xxx-x</div>
+      </div>
+    </div>
+
+    <!-- Nb essieux -->
+    <div class="card">
+      <p class="lbl">Essieux</p>
+      <div class="field-group">
+        <label class="lbl" style="font-size:.6rem;margin-bottom:6px">Nombre d'essieux à scanner</label>
+        <select class="sel" id="sel-essieux" onchange="onEssieuxChange(this)">
+          <option value="2">2 essieux</option>
+          <option value="4" selected>4 essieux</option>
+          <option value="6">6 essieux</option>
+          <option value="8">8 essieux</option>
+          <option value="autre">Autre…</option>
+        </select>
+      </div>
+      <div id="custom-group" class="field-group" style="display:none">
+        <label class="lbl" style="font-size:.6rem;margin-bottom:6px">Nombre personnalisé</label>
+        <input class="inp" id="inp-custom" type="number" min="1" max="99"
+          placeholder="ex : 3" inputmode="numeric"/>
+      </div>
+      <!-- Pips visuels -->
+      <div id="pips" style="display:flex;gap:5px;margin-top:4px">
+        <!-- généré JS -->
+      </div>
+    </div>
+
+    <div class="mt">
+      <button class="btn btn-amber" onclick="goToScan()">
+        <span>Commencer le scan</span><span>→</span>
+      </button>
+    </div>
+
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════
+     ÉCRAN 2 — SCAN & FORMULAIRE
+═══════════════════════════════════════════════ -->
+<div class="screen" id="s-scan">
+  <div class="topbar">
+    <button class="topbar-back" onclick="goBack()">← Retour</button>
+    <span class="topbar-tag" id="scan-tag">Scan</span>
+  </div>
+  <div class="zone">
+
+    <!-- Header wagon + progression -->
+    <div class="card card-amber" style="margin-bottom:12px;padding:13px 15px">
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <div>
+          <div style="font-family:var(--fd);font-size:.6rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--t3);margin-bottom:3px">Wagon</div>
+          <div class="wagon-num" id="hdr-wagon">—</div>
+        </div>
+        <div style="text-align:right">
+          <div style="font-family:var(--fd);font-size:.6rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--t3);margin-bottom:3px">Essieu</div>
+          <div style="font-family:var(--fd);font-size:2rem;font-weight:900;line-height:1">
+            <span id="hdr-idx" style="color:var(--amber)">1</span><span style="color:var(--t3);font-size:1rem"> / <span id="hdr-total">4</span></span>
+          </div>
+        </div>
+      </div>
+      <div style="margin-top:10px">
+        <div class="prog-wrap"><div class="prog-fill" id="prog" style="width:0%"></div></div>
+        <div class="prog-labels">
+          <span id="prog-done">0 scannés</span>
+          <span id="prog-left">4 restants</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Zone scanner → presse-papier -->
+    <div id="zone-scanner">
+      <p class="lbl" style="margin-bottom:10px">Scanner QR — Essieu <span id="scan-ess-lbl">1</span></p>
+
+      <!-- Instructions étape par étape -->
+      <div class="card" style="margin-bottom:12px;padding:14px 16px">
+        <div style="display:flex;flex-direction:column;gap:12px">
+
+          <div style="display:flex;align-items:center;gap:12px">
+            <div style="width:28px;height:28px;border-radius:50%;background:var(--amber-glow);border:1.5px solid var(--amber-line);display:flex;align-items:center;justify-content:center;font-family:var(--fd);font-weight:900;font-size:.85rem;color:var(--amber);flex-shrink:0">1</div>
+            <div style="font-size:.85rem;color:var(--t2)">Ouvrez le <strong style="color:var(--t1)">Scanner Xiaomi</strong> et scannez le QR code de l'essieu</div>
+          </div>
+
+          <div style="display:flex;align-items:center;gap:12px">
+            <div style="width:28px;height:28px;border-radius:50%;background:var(--amber-glow);border:1.5px solid var(--amber-line);display:flex;align-items:center;justify-content:center;font-family:var(--fd);font-weight:900;font-size:.85rem;color:var(--amber);flex-shrink:0">2</div>
+            <div style="font-size:.85rem;color:var(--t2)"><strong style="color:var(--t1)">Copiez</strong> le résultat (appui long sur le texte → Copier)</div>
+          </div>
+
+          <div style="display:flex;align-items:center;gap:12px">
+            <div style="width:28px;height:28px;border-radius:50%;background:var(--amber-glow);border:1.5px solid var(--amber-line);display:flex;align-items:center;justify-content:center;font-family:var(--fd);font-weight:900;font-size:.85rem;color:var(--amber);flex-shrink:0">3</div>
+            <div style="font-size:.85rem;color:var(--t2)">Revenez ici et appuyez sur <strong style="color:var(--t1)">Coller le QR scanné</strong></div>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- Bouton COLLER principal -->
+      <button class="btn btn-amber" id="btn-paste" onclick="pasteFromClipboard()">
+        <span style="font-size:1.2rem">📋</span>
+        <span>Coller le QR scanné</span>
+      </button>
+
+      <!-- Indicateur "en attente" - s'active quand on revient sur la page -->
+      <div id="paste-hint" style="margin-top:10px;text-align:center;font-size:.75rem;color:var(--t3);line-height:1.5">
+        L'app lit aussi le presse-papier automatiquement<br/>quand vous revenez sur cette page
+      </div>
+
+      <!-- Séparateur -->
+      <div style="display:flex;align-items:center;gap:10px;margin:16px 0 12px">
+        <div style="flex:1;height:1px;background:var(--border)"></div>
+        <span style="font-size:.7rem;color:var(--t3);font-family:var(--fd);letter-spacing:.08em">OU</span>
+        <div style="flex:1;height:1px;background:var(--border)"></div>
+      </div>
+
+      <button class="btn btn-ghost" style="margin-bottom:6px" onclick="enterManual()">
+        ✎ Saisie manuelle sans scan
+      </button>
+    </div>
+
+    <!-- Zone formulaire (après scan) -->
+    <div id="zone-form" style="display:none">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+        <p class="lbl" style="margin-bottom:0">Données extraites</p>
+        <button class="btn btn-ghost btn-sm" onclick="rescan()">↺ Nouveau scan</button>
+      </div>
+
+      <div id="parse-error" style="display:none;background:var(--red-dim);border:1px solid rgba(240,69,69,.25);border-radius:var(--r1);padding:9px 12px;color:var(--red);font-size:.78rem;font-weight:600;margin-bottom:10px"></div>
+
+      <div class="card" style="padding:14px">
+        <div class="field-group">
+          <label class="lbl" style="font-size:.6rem;margin-bottom:5px">N° de série</label>
+          <input class="inp" id="f-sn" type="text" placeholder="SN" autocomplete="off"/>
+        </div>
+        <div class="field-group">
+          <label class="lbl" style="font-size:.6rem;margin-bottom:5px">Type</label>
+          <input class="inp" id="f-type" type="text" placeholder="TYPE" autocomplete="off"/>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+          <div class="field-group">
+            <label class="lbl" style="font-size:.6rem;margin-bottom:5px">Tonnage</label>
+            <input class="inp" id="f-tonnage" type="text" placeholder="TONNAGE" autocomplete="off"/>
+          </div>
+          <div class="field-group">
+            <label class="lbl" style="font-size:.6rem;margin-bottom:5px">Détenteur</label>
+            <input class="inp" id="f-owner" type="text" placeholder="OWNER" autocomplete="off"/>
+          </div>
+        </div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+          <div class="field-group" style="margin-bottom:0">
+            <label class="lbl" style="font-size:.6rem;margin-bottom:5px">Date révision</label>
+            <input class="inp" id="f-rev" type="text" placeholder="REV" autocomplete="off"/>
+          </div>
+          <div class="field-group" style="margin-bottom:0">
+            <label class="lbl" style="font-size:.6rem;margin-bottom:5px">Atelier</label>
+            <input class="inp" id="f-atelier" type="text" placeholder="ATELIER" autocomplete="off"/>
+          </div>
+        </div>
+      </div>
+
+      <button class="btn btn-amber mt" id="btn-save" onclick="saveEssieu()">
+        <span id="btn-save-label">Enregistrer & Suivant</span>
+        <span id="btn-save-icon">→</span>
+      </button>
+    </div>
+
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════
+     ÉCRAN 3 — FIN & HISTORIQUE
+═══════════════════════════════════════════════ -->
+<div class="screen" id="s-fin">
+  <div class="topbar">
+    <div class="topbar-logo">Wagon<em>Ctrl</em></div>
+    <span class="topbar-tag" style="color:var(--green);border-color:rgba(31,217,122,.25)">Terminé</span>
+  </div>
+  <div class="zone">
+
+    <div style="text-align:center;padding:16px 0 8px">
+      <div class="success-ring">
+        <span style="font-size:2rem;color:var(--green)">✓</span>
+      </div>
+      <div style="font-family:var(--fd);font-size:1.9rem;font-weight:900;margin-bottom:6px">Contrôle terminé !</div>
+      <div style="color:var(--t2);font-size:.88rem" id="fin-subtitle">4 essieux enregistrés avec succès.</div>
+    </div>
+
+    <div class="divider"></div>
+
+    <!-- Récap -->
+    <div class="card card-amber">
+      <div style="font-family:var(--fd);font-size:.6rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--t3);margin-bottom:4px">Wagon contrôlé</div>
+      <div class="wagon-num mb" id="fin-wagon">—</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap">
+        <span class="badge badge-green" id="fin-badge-ess">4 essieux</span>
+        <span class="badge badge-amber" id="fin-badge-date">—</span>
+      </div>
+    </div>
+
+    <!-- Export -->
+    <div class="btn-row">
+      <button class="btn btn-ghost" onclick="exportCSV('wagon')">⬇ Export CSV (wagon)</button>
+      <button class="btn btn-ghost btn-sm" style="flex:0;white-space:nowrap" onclick="exportCSV('all')">Tout</button>
+    </div>
+
+    <!-- Historique de ce wagon -->
+    <div style="margin-top:20px">
+      <p class="lbl">Essieux enregistrés</p>
+      <div id="fin-list"></div>
+    </div>
+
+    <div class="btn-row" style="margin-top:20px">
+      <button class="btn btn-amber" onclick="newControl()">+ Nouveau contrôle</button>
+      <button class="btn btn-ghost btn-sm" style="flex:0;white-space:nowrap;padding:0 16px" onclick="showAllHistory()">Historique</button>
+    </div>
+
+  </div>
+</div>
+
+<!-- ═══════════════════════════════════════════════
+     ÉCRAN 4 — HISTORIQUE GLOBAL
+═══════════════════════════════════════════════ -->
+<div class="screen" id="s-history">
+  <div class="topbar">
+    <button class="topbar-back" onclick="showScreen('s-fin')">← Retour</button>
+    <span class="topbar-tag">Historique</span>
+  </div>
+  <div class="zone">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px">
+      <div style="font-family:var(--fd);font-size:1.4rem;font-weight:800">Tous les contrôles</div>
+      <button class="btn btn-danger btn-sm" onclick="clearAll()">🗑 Tout effacer</button>
+    </div>
+    <button class="btn btn-ghost mb" onclick="exportCSV('all')">⬇ Export CSV complet</button>
+    <div id="hist-list"></div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div id="toast">
+  <span id="toast-icon" style="font-size:1rem;flex-shrink:0"></span>
+  <span id="toast-msg"></span>
+</div>
+
+<!-- ═══════════════════════════════════════════════
+     JAVASCRIPT
+═══════════════════════════════════════════════ -->
+<script>
+/* ── STATE ─────────────────────────────────────────────── */
+const state = {
+  wagon: '',
+  nbEssieux: 4,
+  essieuIndex: 1,
+};
+
+/* ── STORAGE ────────────────────────────────────────────── */
+const DB_KEY = 'wagonctrl_v1';
+
+function loadDB() {
+  try { return JSON.parse(localStorage.getItem(DB_KEY)) || []; }
+  catch { return []; }
+}
+
+function saveDB(rows) {
+  localStorage.setItem(DB_KEY, JSON.stringify(rows));
+}
+
+function addRecord(rec) {
+  const rows = loadDB();
+  rec.id = Date.now();
+  rec.created_at = new Date().toISOString();
+  rows.push(rec);
+  saveDB(rows);
+  return rec;
+}
+
+function getByWagon(wagon) {
+  return loadDB().filter(r => r.wagon === wagon).sort((a,b) => a.essieu_index - b.essieu_index);
+}
+
+/* ── QR PARSING ─────────────────────────────────────────── */
+function parseQR(raw) {
+  if (!raw) return null;
+  const pairs = {};
+  raw.split(';').forEach(seg => {
+    const eq = seg.indexOf('=');
+    if (eq === -1) return;
+    pairs[seg.slice(0, eq).trim().toUpperCase()] = seg.slice(eq + 1).trim();
+  });
+  const REQUIRED = ['SN','TYPE','TONNAGE','OWNER','REV','ATELIER'];
+  const missing = REQUIRED.filter(k => !pairs[k]);
+  return { pairs, missing };
+}
+
+/* ── WAGON VALIDATION ───────────────────────────────────── */
+function validateWagon(v) {
+  return /^\d{2} \d{2} \d{4} \d{3}-\d$/.test(v);
+}
+
+function onWagonInput(el) {
+  const cursor = el.selectionStart;
+  const raw    = el.value;
+
+  // Extraire uniquement les chiffres et l'éventuel tiret final
+  const digits = raw.replace(/[^\d]/g, '');
+
+  // Appliquer le format : XX XX XXXX XXX-X
+  let formatted = '';
+  if (digits.length <= 2)  formatted = digits;
+  else if (digits.length <= 4)  formatted = digits.slice(0,2) + ' ' + digits.slice(2);
+  else if (digits.length <= 8)  formatted = digits.slice(0,2) + ' ' + digits.slice(2,4) + ' ' + digits.slice(4);
+  else if (digits.length <= 11) formatted = digits.slice(0,2) + ' ' + digits.slice(2,4) + ' ' + digits.slice(4,8) + ' ' + digits.slice(8);
+  else                          formatted = digits.slice(0,2) + ' ' + digits.slice(2,4) + ' ' + digits.slice(4,8) + ' ' + digits.slice(8,11) + '-' + digits.slice(11,12);
+
+  // Mettre à jour uniquement si le format change (évite boucle)
+  if (el.value !== formatted) {
+    el.value = formatted;
+    // Repositionner le curseur intelligemment après l'espace inséré
+    const added = formatted.length - raw.length;
+    el.setSelectionRange(cursor + added, cursor + added);
+  }
+
+  // Feedback visuel
+  const fb = document.getElementById('wagon-feedback');
+  if (!formatted) {
+    el.className = 'inp';
+    fb.className = 'hint';
+    fb.textContent = 'Format : xx xx xxxx xxx-x';
+  } else if (validateWagon(formatted)) {
+    el.className = 'inp ok';
+    fb.className = 'oktxt';
+    fb.textContent = '✓ Format valide';
+  } else {
+    el.className = 'inp err';
+    fb.className = 'errtxt';
+    fb.textContent = digits.length + '/12 chiffres — ex : 33 87 4935 002-7';
+  }
+}
+
+function onEssieuxChange(sel) {
+  const cg = document.getElementById('custom-group');
+  cg.style.display = sel.value === 'autre' ? 'block' : 'none';
+  renderPips(sel.value === 'autre' ? null : parseInt(sel.value));
+}
+
+function renderPips(n) {
+  const el = document.getElementById('pips');
+  if (!n || n > 12) { el.innerHTML = ''; return; }
+  el.innerHTML = Array.from({length:n}).map(() =>
+    `<div style="flex:1;height:4px;border-radius:999px;background:var(--amber-dim)"></div>`
+  ).join('');
+}
+
+/* Initial pips */
+renderPips(4);
+
+/* ── NAVIGATION ─────────────────────────────────────────── */
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  window.scrollTo(0,0);
+}
+
+function goBack() {
+  showScreen('s-wagon');
+}
+
+/* ── GO TO SCAN ─────────────────────────────────────────── */
+function goToScan() {
+  const wagonVal = document.getElementById('inp-wagon').value.trim();
+  const selVal   = document.getElementById('sel-essieux').value;
+  const custom   = document.getElementById('inp-custom').value;
+
+  if (!validateWagon(wagonVal)) {
+    toast('Format wagon invalide : xx xx xxxx xxx-x', 'error'); return;
+  }
+
+  let nb;
+  if (selVal === 'autre') {
+    nb = parseInt(custom, 10);
+    if (!nb || nb <= 0) { toast('Nombre d\'essieux invalide', 'error'); return; }
+  } else {
+    nb = parseInt(selVal, 10);
+  }
+
+  state.wagon      = wagonVal;
+  state.nbEssieux  = nb;
+  state.essieuIndex = 1;
+
+  updateScanHeader();
+  showScreen('s-scan');
+  showScannerZone();
+}
+
+/* ── SCAN ZONE ──────────────────────────────────────────── */
+function showScannerZone() {
+  document.getElementById('zone-scanner').style.display = 'block';
+  document.getElementById('zone-form').style.display    = 'none';
+  document.getElementById('parse-error').style.display  = 'none';
+}
+
+function showFormZone(pairs, missing) {
+  document.getElementById('zone-scanner').style.display = 'none';
+  document.getElementById('zone-form').style.display    = 'block';
+
+  document.getElementById('f-sn').value      = pairs['SN']      || '';
+  document.getElementById('f-type').value    = pairs['TYPE']    || '';
+  document.getElementById('f-tonnage').value = pairs['TONNAGE'] || '';
+  document.getElementById('f-owner').value   = pairs['OWNER']   || '';
+  document.getElementById('f-rev').value     = pairs['REV']     || '';
+  document.getElementById('f-atelier').value = pairs['ATELIER'] || '';
+
+  const errDiv = document.getElementById('parse-error');
+  if (missing.length > 0) {
+    errDiv.style.display = 'block';
+    errDiv.textContent   = '⚠ Clés manquantes : ' + missing.join(', ') + ' — corrigez manuellement.';
+  } else {
+    errDiv.style.display = 'none';
+  }
+
+  updateSaveButton();
+}
+
+function updateScanHeader() {
+  const i = state.essieuIndex, n = state.nbEssieux;
+  document.getElementById('hdr-wagon').textContent  = state.wagon;
+  document.getElementById('hdr-idx').textContent    = i;
+  document.getElementById('hdr-total').textContent  = n;
+  document.getElementById('scan-ess-lbl').textContent = i;
+  document.getElementById('scan-tag').textContent   = `Essieu ${i}/${n}`;
+  document.getElementById('prog').style.width       = `${((i-1)/n)*100}%`;
+  document.getElementById('prog-done').textContent  = `${i-1} scannés`;
+  document.getElementById('prog-left').textContent  = `${n-i+1} restants`;
+}
+
+function updateSaveButton() {
+  const last = state.essieuIndex >= state.nbEssieux;
+  document.getElementById('btn-save-label').textContent = last ? 'Enregistrer & Terminer' : 'Enregistrer & Suivant';
+  document.getElementById('btn-save-icon').textContent  = last ? '✓' : '→';
+}
+
+/* ── PRESSE-PAPIER ──────────────────────────────────────── */
+
+// Lecture automatique quand on revient sur la page (visibilité)
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') {
+    const scannerVisible = document.getElementById('zone-scanner').style.display !== 'none';
+    const scanScreenActive = document.getElementById('s-scan').classList.contains('active');
+    if (scanScreenActive && scannerVisible) {
+      // Petit délai pour laisser Android finir de copier
+      setTimeout(tryAutoReadClipboard, 400);
+    }
+  }
+});
+
+// Tentative silencieuse au retour sur la page
+async function tryAutoReadClipboard() {
+  try {
+    const text = await navigator.clipboard.readText();
+    if (!text || !text.includes('=')) return; // Pas un QR wagon
+    const { pairs, missing } = parseQR(text);
+    // Ne déclencher que si on reconnaît au moins une clé connue
+    const knownKeys = ['SN','TYPE','TONNAGE','OWNER','REV','ATELIER'];
+    const hasKnown  = knownKeys.some(k => k in pairs);
+    if (!hasKnown) return;
+    // Vider le presse-papier pour ne pas re-déclencher
+    try { await navigator.clipboard.writeText(''); } catch(_) {}
+    showFormZone(pairs, missing);
+    toast('QR code détecté automatiquement ✓', 'success');
+  } catch(_) {
+    // Refus de permission silencieux — l'utilisateur utilisera le bouton Coller
+  }
+}
+
+// Bouton "Coller" explicite
+async function pasteFromClipboard() {
+  try {
+    const text = await navigator.clipboard.readText();
+    if (!text || !text.trim()) {
+      toast('Presse-papier vide — copiez d\'abord le résultat du scanner', 'error');
+      return;
+    }
+    const { pairs, missing } = parseQR(text.trim());
+    showFormZone(pairs, missing);
+    // Vider le presse-papier pour éviter un double-collage
+    try { await navigator.clipboard.writeText(''); } catch(_) {}
+  } catch(err) {
+    // API Clipboard bloquée (Chrome demande parfois la permission)
+    showClipboardFallback();
+  }
+}
+
+// Fallback si l'API Clipboard est bloquée : champ texte manuel
+function showClipboardFallback() {
+  const hint = document.getElementById('paste-hint');
+  hint.innerHTML = `
+    <div style="margin-top:8px">
+      <div style="font-size:.78rem;color:var(--red);margin-bottom:8px;font-weight:600">
+        ⚠ Accès presse-papier refusé par Chrome
+      </div>
+      <div style="font-size:.75rem;color:var(--t3);margin-bottom:8px">
+        Collez manuellement le texte du QR ici :
+      </div>
+      <textarea id="manual-paste-area"
+        style="width:100%;background:var(--bg-0);border:1.5px solid var(--amber-line);
+               border-radius:var(--r1);padding:10px;color:var(--t1);font-family:var(--fd);
+               font-size:.9rem;resize:none;outline:none;min-height:80px"
+        placeholder="SN=12345;TYPE=ABC;TONNAGE=20;OWNER=XYZ;REV=1;ATELIER=PARIS"></textarea>
+      <button class="btn btn-amber" style="margin-top:8px" onclick="submitManualPaste()">
+        Valider
+      </button>
+    </div>
+  `;
+}
+
+function submitManualPaste() {
+  const area = document.getElementById('manual-paste-area');
+  if (!area) return;
+  const text = area.value.trim();
+  if (!text) { toast('Collez le texte du QR code', 'error'); return; }
+  const { pairs, missing } = parseQR(text);
+  showFormZone(pairs, missing);
+}
+
+function rescan() {
+  showScannerZone();
+  // Reset le hint au cas où le fallback était affiché
+  document.getElementById('paste-hint').innerHTML =
+    `L'app lit aussi le presse-papier automatiquement<br/>quand vous revenez sur cette page`;
+}
+
+function enterManual() {
+  showFormZone({ SN:'', TYPE:'', TONNAGE:'', OWNER:'', REV:'', ATELIER:'' }, []);
+  document.getElementById('parse-error').style.display = 'none';
+}
+
+async function stopScanner() { return; }
+
+/* ── SAVE ───────────────────────────────────────────────── */
+function saveEssieu() {
+  const fields = {
+    sn:           document.getElementById('f-sn').value.trim(),
+    type:         document.getElementById('f-type').value.trim(),
+    tonnage:      document.getElementById('f-tonnage').value.trim(),
+    detenteur:    document.getElementById('f-owner').value.trim(),
+    date_revision:document.getElementById('f-rev').value.trim(),
+    atelier:      document.getElementById('f-atelier').value.trim(),
+  };
+
+  const empty = Object.entries(fields)
+    .filter(([,v]) => !v)
+    .map(([k]) => ({sn:'N° série',type:'Type',tonnage:'Tonnage',detenteur:'Détenteur',date_revision:'Date révision',atelier:'Atelier'}[k]));
+
+  if (empty.length) {
+    toast('Champs vides : ' + empty.join(', '), 'error'); return;
+  }
+
+  addRecord({
+    wagon:        state.wagon,
+    essieu_index: state.essieuIndex,
+    ...fields,
+  });
+
+  toast(`Essieu ${state.essieuIndex}/${state.nbEssieux} enregistré ✓`, 'success');
+
+  if (state.essieuIndex >= state.nbEssieux) {
+    setTimeout(() => goToFin(), 350);
+  } else {
+    state.essieuIndex++;
+    updateScanHeader();
+    showScannerZone();
+    setDecodeState('idle');
+  }
+}
+
+/* ── FIN ────────────────────────────────────────────────── */
+function goToFin() {
+  const n = state.nbEssieux;
+  document.getElementById('fin-subtitle').textContent =
+    `${n} essieu${n>1?'x':''} enregistré${n>1?'s':''} avec succès.`;
+  document.getElementById('fin-wagon').textContent  = state.wagon;
+  document.getElementById('fin-badge-ess').textContent = `${n} essieu${n>1?'x':''}`;
+  document.getElementById('fin-badge-date').textContent = new Date().toLocaleDateString('fr-FR');
+
+  // Liste des essieux
+  const list = document.getElementById('fin-list');
+  const records = getByWagon(state.wagon);
+  if (!records.length) { list.innerHTML = '<div class="empty"><div class="empty-icon">📋</div><div>Aucune donnée.</div></div>'; }
+  else list.innerHTML = records.map(r => renderHistItem(r)).join('');
+
+  showScreen('s-fin');
+}
+
+function renderHistItem(r) {
+  return `
+  <div class="hist-item">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
+      <span style="font-family:var(--fd);font-size:.72rem;font-weight:800;color:var(--amber);letter-spacing:.06em">ESSIEU ${r.essieu_index}</span>
+      <span style="font-family:var(--fd);font-size:.68rem;color:var(--t3)">SN ${r.sn || '—'}</span>
+    </div>
+    <div class="dgrid">
+      <div class="dcell"><div class="dcell-lbl">Type</div><div class="dcell-val">${r.type||'—'}</div></div>
+      <div class="dcell"><div class="dcell-lbl">Tonnage</div><div class="dcell-val">${r.tonnage||'—'}</div></div>
+      <div class="dcell"><div class="dcell-lbl">Détenteur</div><div class="dcell-val">${r.detenteur||'—'}</div></div>
+      <div class="dcell"><div class="dcell-lbl">Atelier</div><div class="dcell-val">${r.atelier||'—'}</div></div>
+    </div>
+    ${r.date_revision ? `<div style="margin-top:6px;font-size:.7rem;color:var(--t3)">Révision : ${r.date_revision}</div>` : ''}
+    <div style="margin-top:4px;font-size:.68rem;color:var(--t4)">${r.wagon} · ${new Date(r.created_at).toLocaleString('fr-FR')}</div>
+  </div>`;
+}
+
+/* ── HISTORY ────────────────────────────────────────────── */
+function showAllHistory() {
+  const all = loadDB().sort((a,b) => new Date(b.created_at) - new Date(a.created_at));
+  const list = document.getElementById('hist-list');
+  if (!all.length) {
+    list.innerHTML = '<div class="empty"><div class="empty-icon">📋</div><div>Aucun contrôle enregistré.</div></div>';
+  } else {
+    list.innerHTML = all.map(r => renderHistItem(r)).join('');
+  }
+  showScreen('s-history');
+}
+
+function clearAll() {
+  if (!confirm('Effacer TOUTES les données ? Cette action est irréversible.')) return;
+  localStorage.removeItem(DB_KEY);
+  toast('Données effacées', 'success');
+  showScreen('s-wagon');
+}
+
+/* ── EXPORT CSV ─────────────────────────────────────────── */
+function exportCSV(mode) {
+  const rows = mode === 'wagon' ? getByWagon(state.wagon) : loadDB();
+  if (!rows.length) { toast('Aucune donnée à exporter', 'error'); return; }
+
+  const header = 'wagon,essieu_index,numero_serie,type,tonnage,detenteur,date_revision,atelier,date_enregistrement\n';
+  const csv = rows.map(r =>
+    [`"${r.wagon}"`, r.essieu_index, `"${r.sn||''}"`, `"${r.type||''}"`,
+     `"${r.tonnage||''}"`, `"${r.detenteur||''}"`, `"${r.date_revision||''}"`,
+     `"${r.atelier||''}"`, `"${r.created_at}"`].join(',')
+  ).join('\n');
+
+  const blob = new Blob(['\uFEFF' + header + csv], { type: 'text/csv;charset=utf-8;' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  const name = mode === 'wagon'
+    ? `controle_${state.wagon.replace(/\s/g,'_')}.csv`
+    : `controles_wagons_${new Date().toISOString().slice(0,10)}.csv`;
+
+  a.href = url; a.download = name;
+  document.body.appendChild(a); a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  toast(`CSV exporté : ${name}`, 'success');
+}
+
+/* ── NEW CONTROL ────────────────────────────────────────── */
+function newControl() {
+  document.getElementById('inp-wagon').value = '';
+  document.getElementById('inp-wagon').className = 'inp';
+  document.getElementById('wagon-feedback').className = 'hint';
+  document.getElementById('wagon-feedback').textContent = 'Format : xx xx xxxx xxx-x';
+  document.getElementById('sel-essieux').value = '4';
+  document.getElementById('custom-group').style.display = 'none';
+  renderPips(4);
+  showScreen('s-wagon');
+}
+
+/* ── TOAST ──────────────────────────────────────────────── */
+let toastTimer;
+function toast(msg, type = 'info') {
+  const el   = document.getElementById('toast');
+  const icon = document.getElementById('toast-icon');
+  const txt  = document.getElementById('toast-msg');
+  const colors = { success: 'var(--green)', error: 'var(--red)', info: 'var(--amber)' };
+  const icons  = { success: '✓', error: '✕', info: 'ℹ' };
+
+  icon.textContent = icons[type] || 'ℹ';
+  icon.style.color = colors[type] || 'var(--amber)';
+  txt.textContent  = msg;
+  el.className     = 'show';
+
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => { el.className = ''; }, 3200);
+}
+</script>
+</body>
+</html>
