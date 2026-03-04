@@ -971,18 +971,21 @@ function buildCSV(mode) {
   const rows = mode === 'wagon' ? getByWagon(state.wagon) : loadDB();
   if (!rows.length) return null;
 
-  const header = 'wagon,essieu_index,numero_serie,type,tonnage,detenteur,date_revision,atelier,date_enregistrement\n';
+  // Séparateur ";" pour Excel français + directive sep=
+  const sep    = ';';
+  const hint   = 'sep=;\n';
+  const header = `wagon${sep}essieu_index${sep}numero_serie${sep}type${sep}tonnage${sep}detenteur${sep}date_revision${sep}atelier${sep}date_enregistrement\n`;
   const csv = rows.map(r =>
     [`"${r.wagon}"`, r.essieu_index, `"${r.sn||''}"`, `"${r.type||''}"`,
      `"${r.tonnage||''}"`, `"${r.detenteur||''}"`, `"${r.date_revision||''}"`,
-     `"${r.atelier||''}"`, `"${r.created_at}"`].join(',')
+     `"${r.atelier||''}"`, `"${r.created_at}"`].join(sep)
   ).join('\n');
 
   const filename = mode === 'wagon'
     ? `controle_${state.wagon.replace(/\s/g,'_')}.csv`
     : `controles_wagons_${new Date().toISOString().slice(0,10)}.csv`;
 
-  const blob = new Blob(['\uFEFF' + header + csv], { type: 'text/csv;charset=utf-8;' });
+  const blob = new Blob(['\uFEFF' + hint + header + csv], { type: 'text/csv;charset=utf-8;' });
   return { blob, filename, rows };
 }
 
