@@ -403,37 +403,36 @@ body {
     <div id="zone-scanner">
       <p class="lbl" style="margin-bottom:10px">Scanner QR — Essieu <span id="scan-ess-lbl">1</span></p>
 
-      <!-- Instructions étape par étape -->
-      <div class="card" style="margin-bottom:12px;padding:14px 16px">
-        <div style="display:flex;flex-direction:column;gap:12px">
-
-          <div style="display:flex;align-items:center;gap:12px">
-            <div style="width:28px;height:28px;border-radius:50%;background:var(--amber-glow);border:1.5px solid var(--amber-line);display:flex;align-items:center;justify-content:center;font-family:var(--fd);font-weight:900;font-size:.85rem;color:var(--amber);flex-shrink:0">1</div>
-            <div style="font-size:.85rem;color:var(--t2)">Ouvrez le <strong style="color:var(--t1)">Scanner Xiaomi</strong> et scannez le QR code de l'essieu</div>
+      <!-- Bouton principal : ouvre le Scanner Xiaomi -->
+      <button class="btn btn-amber" id="btn-open-scanner" onclick="openScanner()" style="padding:20px;flex-direction:column;gap:10px;height:auto">
+        <div style="width:64px;height:64px;border-radius:50%;background:rgba(0,0,0,0.2);display:flex;align-items:center;justify-content:center;font-size:2rem">
+          📷
+        </div>
+        <div>
+          <div style="font-size:1.1rem;font-weight:900;letter-spacing:.06em">Ouvrir le Scanner</div>
+          <div style="font-size:.75rem;font-weight:400;opacity:.7;text-transform:none;letter-spacing:0;margin-top:3px">
+            Scannez le QR puis revenez ici
           </div>
+        </div>
+      </button>
 
-          <div style="display:flex;align-items:center;gap:12px">
-            <div style="width:28px;height:28px;border-radius:50%;background:var(--amber-glow);border:1.5px solid var(--amber-line);display:flex;align-items:center;justify-content:center;font-family:var(--fd);font-weight:900;font-size:.85rem;color:var(--amber);flex-shrink:0">2</div>
-            <div style="font-size:.85rem;color:var(--t2)"><strong style="color:var(--t1)">Copiez</strong> le résultat (appui long sur le texte → Copier)</div>
-          </div>
-
-          <div style="display:flex;align-items:center;gap:12px">
-            <div style="width:28px;height:28px;border-radius:50%;background:var(--amber-glow);border:1.5px solid var(--amber-line);display:flex;align-items:center;justify-content:center;font-family:var(--fd);font-weight:900;font-size:.85rem;color:var(--amber);flex-shrink:0">3</div>
-            <div style="font-size:.85rem;color:var(--t2)">Revenez ici et appuyez sur <strong style="color:var(--t1)">Coller le QR scanné</strong></div>
-          </div>
-
+      <!-- Statut retour : affiché quand on revient du scanner -->
+      <div id="scan-return-status" style="display:none;margin-top:10px">
+        <div style="display:flex;align-items:center;gap:10px;background:var(--bg-3);border:1px solid var(--amber-line);border-radius:var(--r1);padding:12px 14px">
+          <div class="spin" style="border-color:rgba(240,165,0,.2);border-top-color:var(--amber);flex-shrink:0"></div>
+          <span style="font-size:.82rem;color:var(--t2)">Lecture du QR code en cours…</span>
         </div>
       </div>
 
-      <!-- Bouton COLLER principal -->
-      <button class="btn btn-amber" id="btn-paste" onclick="pasteFromClipboard()">
-        <span style="font-size:1.2rem">📋</span>
-        <span>Coller le QR scanné</span>
-      </button>
+      <!-- Fallback : bouton coller manuel si auto-lecture échoue -->
+      <div id="paste-fallback" style="display:none;margin-top:10px">
+        <button class="btn btn-ghost" onclick="pasteFromClipboard()">
+          <span>📋</span><span>Coller manuellement le résultat</span>
+        </button>
+      </div>
 
-      <!-- Indicateur "en attente" - s'active quand on revient sur la page -->
       <div id="paste-hint" style="margin-top:10px;text-align:center;font-size:.75rem;color:var(--t3);line-height:1.5">
-        L'app lit aussi le presse-papier automatiquement<br/>quand vous revenez sur cette page
+        Le résultat sera lu automatiquement à votre retour
       </div>
 
       <!-- Séparateur -->
@@ -778,38 +777,90 @@ function updateSaveButton() {
 
 /* ── PRESSE-PAPIER ──────────────────────────────────────── */
 
-// Lecture automatique quand on revient sur la page (visibilité)
-document.addEventListener('visibilitychange', () => {
-  if (document.visibilityState === 'visible') {
-    const scannerVisible = document.getElementById('zone-scanner').style.display !== 'none';
-    const scanScreenActive = document.getElementById('s-scan').classList.contains('active');
-    if (scanScreenActive && scannerVisible) {
-      // Petit délai pour laisser Android finir de copier
-      setTimeout(tryAutoReadClipboard, 400);
+// Flag : l'utilisateur vient d'ouvrir le scanner → on attend son retour
+let scannerJustOpened = false;
+
+// Ouvre le Scanner Xiaomi via intent Android
+function openScanner() {
+  scannerJustOpened = true;
+
+  // Intent Android pour ouvrir l'app Scanner Xiaomi
+  // Tente plusieurs intents connus du scanner Xiaomi / MIUI
+  const intents = [
+    'intent://scan/#Intent;scheme=zxing;package=com.xiaomi.scanner;end',
+    'intent://scan/#Intent;scheme=zxing;package=com.google.zxing.client.android;end',
+    'zxing://scan/',
+  ];
+
+  // On essaie le premier intent (Xiaomi natif)
+  window.location.href = intents[0];
+
+  // Fallback après 1.5s si l'app ne s'ouvre pas : essayer zxing générique
+  setTimeout(() => {
+    if (document.visibilityState === 'visible' && scannerJustOpened) {
+      window.location.href = intents[2];
     }
+  }, 1500);
+}
+
+// Quand on revient sur la page après le scanner
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState !== 'visible') return;
+
+  const scanScreenActive  = document.getElementById('s-scan').classList.contains('active');
+  const scannerZoneVisible = document.getElementById('zone-scanner').style.display !== 'none';
+
+  if (!scanScreenActive || !scannerZoneVisible) return;
+
+  if (scannerJustOpened) {
+    scannerJustOpened = false;
+    // Afficher indicateur de lecture
+    document.getElementById('scan-return-status').style.display = 'block';
+    document.getElementById('paste-hint').style.display = 'none';
+
+    // Délai pour laisser Xiaomi copier dans le presse-papier
+    setTimeout(() => tryAutoReadClipboard(true), 600);
   }
 });
 
-// Tentative silencieuse au retour sur la page
-async function tryAutoReadClipboard() {
+// Lecture automatique du presse-papier
+async function tryAutoReadClipboard(showFallbackOnFail = false) {
   try {
     const text = await navigator.clipboard.readText();
-    if (!text || !text.includes('=')) return; // Pas un QR wagon
-    const { pairs, missing } = parseQR(text);
-    // Ne déclencher que si on reconnaît au moins une clé connue
-    const knownKeys = ['SN','TYPE','TONNAGE','OWNER','REV','ATELIER'];
-    const hasKnown  = knownKeys.some(k => k in pairs);
-    if (!hasKnown) return;
+
+    // Vérifier que c'est bien un QR wagon (contient au moins une clé connue)
+    const knownKeys = ['SN=','TYPE=','TONNAGE=','OWNER=','REV=','ATELIER='];
+    const isQR = text && knownKeys.some(k => text.toUpperCase().includes(k));
+
+    if (!isQR) {
+      throw new Error('Contenu presse-papier non reconnu');
+    }
+
     // Vider le presse-papier pour ne pas re-déclencher
     try { await navigator.clipboard.writeText(''); } catch(_) {}
+
+    // Masquer indicateur
+    document.getElementById('scan-return-status').style.display = 'none';
+    document.getElementById('paste-hint').style.display = 'block';
+
+    const { pairs, missing } = parseQR(text.trim());
     showFormZone(pairs, missing);
-    toast('QR code détecté automatiquement ✓', 'success');
-  } catch(_) {
-    // Refus de permission silencieux — l'utilisateur utilisera le bouton Coller
+    toast('QR code lu automatiquement ✓', 'success');
+
+  } catch(err) {
+    document.getElementById('scan-return-status').style.display = 'none';
+    document.getElementById('paste-hint').style.display = 'block';
+
+    if (showFallbackOnFail) {
+      // Afficher bouton coller manuel
+      document.getElementById('paste-fallback').style.display = 'block';
+      document.getElementById('paste-hint').innerHTML =
+        'Lecture automatique impossible —<br/>copiez le résultat et collez-le ci-dessus';
+    }
   }
 }
 
-// Bouton "Coller" explicite
+// Bouton coller manuel (fallback)
 async function pasteFromClipboard() {
   try {
     const text = await navigator.clipboard.readText();
@@ -819,10 +870,8 @@ async function pasteFromClipboard() {
     }
     const { pairs, missing } = parseQR(text.trim());
     showFormZone(pairs, missing);
-    // Vider le presse-papier pour éviter un double-collage
     try { await navigator.clipboard.writeText(''); } catch(_) {}
   } catch(err) {
-    // API Clipboard bloquée (Chrome demande parfois la permission)
     showClipboardFallback();
   }
 }
@@ -861,9 +910,12 @@ function submitManualPaste() {
 
 function rescan() {
   showScannerZone();
-  // Reset le hint au cas où le fallback était affiché
+  scannerJustOpened = false;
+  document.getElementById('scan-return-status').style.display = 'none';
+  document.getElementById('paste-fallback').style.display     = 'none';
+  document.getElementById('paste-hint').style.display         = 'block';
   document.getElementById('paste-hint').innerHTML =
-    `L'app lit aussi le presse-papier automatiquement<br/>quand vous revenez sur cette page`;
+    'Le résultat sera lu automatiquement à votre retour';
 }
 
 function enterManual() {
