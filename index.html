@@ -1642,20 +1642,36 @@ function showReadyToShare(blob, filename, mimeType) {
   // Bouton Partager — geste utilisateur direct → navigator.share() fonctionne sur Chrome Android HTTPS
   document.getElementById('srp-share').addEventListener('click', () => {
     panel.remove();
-    if (navigator.share) {
+    if (!navigator.share) {
+      dlBlob(blob, filename);
+      toast('Partage non supporté — fichier téléchargé', 'info');
+      return;
+    }
+
+    // Tester d'abord si le partage de fichier est supporté
+    const canShareFile = navigator.canShare && navigator.canShare({ files: [file] });
+
+    if (canShareFile) {
+      // Partage direct avec fichier joint
       navigator.share({ files: [file] })
         .then(() => toast('Fichier partagé ✓', 'success'))
         .catch(e => {
-          if (e.name === 'AbortError') return; // utilisateur a annulé
-          // share avec fichier échoue → télécharger + ouvrir sélecteur sans fichier
+          if (e.name === 'AbortError') return;
+          // Erreur inattendue - afficher le message pour debug
+          toast('Erreur : ' + e.name + ' — ' + e.message, 'error');
           dlBlob(blob, filename);
-          navigator.share({ title: filename.replace(/\.xlsx$/, '').replace(/_/g,' '), text: 'Fichier téléchargé : ' + filename })
-            .catch(() => {});
-          toast('Fichier téléchargé — joignez-le au mail', 'info');
         });
     } else {
+      // Le partage de fichier n'est pas supporté sur cet appareil/navigateur
+      // Solution : télécharger + ouvrir Gmail/Outlook directement via intent
       dlBlob(blob, filename);
-      toast('Fichier téléchargé', 'info');
+      // Attendre que le téléchargement démarre, puis ouvrir le sélecteur mail
+      setTimeout(() => {
+        const subj = encodeURIComponent('WagonCtrl — ' + filename.replace(/\.xlsx$|\.csv$/, '').replace(/_/g, ' '));
+        const body = encodeURIComponent('Bonjour,\n\nVeuillez trouver le fichier en pièce jointe.\n\nWagonCtrl');
+        window.location.href = 'mailto:?subject=' + subj + '&body=' + body;
+      }, 800);
+      toast('Fichier téléchargé — ajoutez-le en pièce jointe', 'info');
     }
   });
 
