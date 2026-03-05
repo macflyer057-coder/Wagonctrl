@@ -298,40 +298,7 @@ body {
 ::-webkit-scrollbar { width:2px; }
 ::-webkit-scrollbar-thumb { background:var(--t4); }
 </style>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js">
-// ── Copier les données du wagon dans le presse-papier ──
-async function copyWagonData() {
-  const rows = getByWagon(state.wagon);
-  if (!rows.length) { toast('Aucune donnée à copier', 'error'); return; }
-
-  const lines = [`Wagon : ${state.wagon}`, ''];
-  rows.forEach(r => {
-    lines.push(`— Essieu ${r.essieu_index} —`);
-    if (r.sn)            lines.push(`  SN        : ${r.sn}`);
-    if (r.type)          lines.push(`  Type      : ${r.type}`);
-    if (r.detenteur)     lines.push(`  Détenteur : ${r.detenteur}`);
-    if (r.date_revision) lines.push(`  Date IS2  : ${r.date_revision}`);
-    if (r.atelier)       lines.push(`  Atelier   : ${r.atelier}`);
-    lines.push('');
-  });
-  const text = lines.join('\n');
-
-  try {
-    await navigator.clipboard.writeText(text);
-    toast('Données copiées dans le presse-papier ✓', 'success');
-  } catch(e) {
-    // Fallback : sélectionner depuis un textarea temporaire
-    const ta = document.createElement('textarea');
-    ta.value = text;
-    ta.style.cssText = 'position:fixed;left:-9999px;top:0';
-    document.body.appendChild(ta);
-    ta.select();
-    document.execCommand('copy');
-    document.body.removeChild(ta);
-    toast('Données copiées ✓', 'success');
-  }
-}
-</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 </head>
 <body>
 
@@ -1058,7 +1025,7 @@ function saveEssieu() {
 /* ── FIN ────────────────────────────────────────────────── */
 function goToFin() {
   const n = state.nbEssieux;
-  const typeLabel = state.controlType === 'sortie' ? '🔼 Essieux à la sortie' : '🔽 Essieux à l'entrée';
+  const typeLabel = state.controlType === 'sortie' ? '🔼 Essieux à la sortie' : "🔽 Essieux à l'entrée";
   document.getElementById('fin-subtitle').textContent =
     `${typeLabel} — ${n} essieu${n>1?'x':''} enregistré${n>1?'s':''}.`;
   document.getElementById('fin-wagon').textContent  = state.wagon;
@@ -1164,11 +1131,7 @@ function shareCSV(mode) {
   if (!navigator.share) {
     dlBlob(blob, filename);
     const subj = encodeURIComponent(subject);
-    const body = encodeURIComponent('Bonjour,
-
-Veuillez joindre le fichier : ' + filename + '
-
-WagonCtrl');
+    const body = encodeURIComponent('Bonjour,\n\nVeuillez joindre le fichier : ' + filename + '\n\nWagonCtrl');
     setTimeout(() => { window.location.href = 'mailto:?subject=' + subj + '&body=' + body; }, 400);
     toast('Fichier téléchargé — joignez-le au mail', 'info');
     return;
@@ -1653,11 +1616,7 @@ function showShareDialog() {
         if (!r) return;
         dlBlob(r.blob, r.filename);
         const subj = encodeURIComponent('Formulaire wagon ' + state.wagon);
-        const body = encodeURIComponent('Bonjour,
-
-Veuillez joindre le fichier : ' + r.filename + '
-
-WagonCtrl');
+        const body = encodeURIComponent('Bonjour,\n\nVeuillez joindre le fichier : ' + r.filename + '\n\nWagonCtrl');
         setTimeout(() => { window.location.href = 'mailto:?subject=' + subj + '&body=' + body; }, 400);
         toast('Fichier téléchargé — joignez-le au mail', 'info');
       });
@@ -1778,6 +1737,33 @@ function showShareDialogHistory() {
   document.body.appendChild(overlay);
 }
 
+
+// ── Copier les données du wagon dans le presse-papier ──
+async function copyWagonData() {
+  const rows = getByWagon(state.wagon);
+  if (!rows.length) { toast('Aucune donnée à copier', 'error'); return; }
+  const lines = [`Wagon : ${state.wagon}`, ''];
+  rows.forEach(r => {
+    lines.push(`— Essieu ${r.essieu_index} (${r.control_type === 'sortie' ? 'Sortie' : 'Entrée'}) —`);
+    if (r.sn)            lines.push(`  SN        : ${r.sn}`);
+    if (r.type)          lines.push(`  Type      : ${r.type}`);
+    if (r.detenteur)     lines.push(`  Détenteur : ${r.detenteur}`);
+    if (r.date_revision) lines.push(`  Date IS2  : ${r.date_revision}`);
+    if (r.atelier)       lines.push(`  Atelier   : ${r.atelier}`);
+    lines.push('');
+  });
+  const text = lines.join('\n');
+  try {
+    await navigator.clipboard.writeText(text);
+    toast('Données copiées ✓', 'success');
+  } catch(e) {
+    const ta = document.createElement('textarea');
+    ta.value = text; ta.style.cssText = 'position:fixed;left:-9999px;top:0';
+    document.body.appendChild(ta); ta.select();
+    document.execCommand('copy'); document.body.removeChild(ta);
+    toast('Données copiées ✓', 'success');
+  }
+}
 </script>
 </body>
 </html>
