@@ -298,7 +298,40 @@ body {
 ::-webkit-scrollbar { width:2px; }
 ::-webkit-scrollbar-thumb { background:var(--t4); }
 </style>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js">
+// ── Copier les données du wagon dans le presse-papier ──
+async function copyWagonData() {
+  const rows = getByWagon(state.wagon);
+  if (!rows.length) { toast('Aucune donnée à copier', 'error'); return; }
+
+  const lines = [`Wagon : ${state.wagon}`, ''];
+  rows.forEach(r => {
+    lines.push(`— Essieu ${r.essieu_index} —`);
+    if (r.sn)            lines.push(`  SN        : ${r.sn}`);
+    if (r.type)          lines.push(`  Type      : ${r.type}`);
+    if (r.detenteur)     lines.push(`  Détenteur : ${r.detenteur}`);
+    if (r.date_revision) lines.push(`  Date IS2  : ${r.date_revision}`);
+    if (r.atelier)       lines.push(`  Atelier   : ${r.atelier}`);
+    lines.push('');
+  });
+  const text = lines.join('\n');
+
+  try {
+    await navigator.clipboard.writeText(text);
+    toast('Données copiées dans le presse-papier ✓', 'success');
+  } catch(e) {
+    // Fallback : sélectionner depuis un textarea temporaire
+    const ta = document.createElement('textarea');
+    ta.value = text;
+    ta.style.cssText = 'position:fixed;left:-9999px;top:0';
+    document.body.appendChild(ta);
+    ta.select();
+    document.execCommand('copy');
+    document.body.removeChild(ta);
+    toast('Données copiées ✓', 'success');
+  }
+}
+</script>
 </head>
 <body>
 
@@ -530,14 +563,14 @@ body {
     <!-- Export + Partage -->
     <div style="display:flex;flex-direction:column;gap:8px;margin-top:4px">
       <button class="btn btn-amber" onclick="exportXLSX('wagon')">
-        <span>📊</span><span>Exporter le formulaire Excel</span>
+        <span>📊</span><span>Télécharger le formulaire Excel</span>
       </button>
-      <button class="btn btn-ghost" onclick="shareXLSX('wagon')">
-        <span>↗</span><span>Envoyer par mail (Excel)</span>
+      <button class="btn btn-ghost" onclick="showShareDialog()">
+        <span>↗</span><span>Envoyer par mail…</span>
       </button>
       <div class="btn-row" style="margin-top:0">
+        <button class="btn btn-ghost btn-sm" onclick="copyWagonData()">📋 Copier données</button>
         <button class="btn btn-ghost btn-sm" onclick="exportCSV('wagon')">⬇ CSV</button>
-        <button class="btn btn-ghost btn-sm" onclick="shareCSV('all')">↗ Tout envoyer</button>
       </div>
     </div>
 
@@ -569,7 +602,7 @@ body {
       <button class="btn btn-danger btn-sm" onclick="clearAll()">🗑 Tout effacer</button>
     </div>
     <div class="btn-row mb">
-      <button class="btn btn-amber" onclick="shareCSV('all')">↗ Envoyer par mail</button>
+      <button class="btn btn-amber" onclick="showShareDialogHistory()">↗ Envoyer par mail…</button>
       <button class="btn btn-ghost btn-sm" style="flex:0;white-space:nowrap;padding:0 14px" onclick="exportCSV('all')">⬇ Télécharger</button>
     </div>
     <div id="hist-list"></div>
@@ -784,38 +817,47 @@ function updateSaveButton() {
 // Flag : l'utilisateur vient d'ouvrir le scanner → on attend son retour
 let scannerJustOpened = false;
 
-// Ouvre le Scanner Xiaomi via intent Android
+// Ouvre le Scanner via intent Android
 function openScanner() {
   scannerJustOpened = true;
 
-  // Méthode 1 : lien <a> avec intent URI (plus fiable que location.href)
-  function tryIntent(uri) {
-    const a = document.createElement('a');
-    a.href = uri;
-    a.style.display = 'none';
-    document.body.appendChild(a);
-    a.click();
-    setTimeout(() => document.body.removeChild(a), 500);
+  // Méthode fiable : créer un lien temporaire et le cliquer programmatiquement
+  function tryUri(uri) {
+    try {
+      const a = document.createElement('a');
+      a.href = uri;
+      a.style.display = 'none';
+      document.body.appendChild(a);
+      a.click();
+      setTimeout(() => { try { document.body.removeChild(a); } catch(_){} }, 500);
+    } catch(e) {}
   }
 
-  // Essaie Xiaomi Scanner d'abord
-  tryIntent('intent://scan/#Intent;scheme=zxing;package=com.xiaomi.scanner;end');
+  // Tenter Xiaomi Scanner en priorité
+  tryUri('intent://scan/#Intent;scheme=zxing;package=com.xiaomi.scanner;S.browser_fallback_url=;end');
 
-  // Après 1.8s, si on est toujours visible (app pas ouverte), essayer zxing générique
+  // Après 1.8s si pas parti, tenter zxing générique (Barcode Scanner, etc.)
   setTimeout(() => {
     if (document.visibilityState === 'visible' && scannerJustOpened) {
-      tryIntent('zxing://scan/');
+      tryUri('zxing://scan/?ret=' + encodeURIComponent(window.location.href));
     }
   }, 1800);
 
-  // Après 3.5s, si toujours visible, montrer message d'aide
+  // Après 3.5s si toujours là, tenter intent générique ACTION_SCAN
+  setTimeout(() => {
+    if (document.visibilityState === 'visible' && scannerJustOpened) {
+      tryUri('intent://com.google.zxing.client.android.SCAN#Intent;scheme=zxing;package=com.google.zxing.client.android;end');
+    }
+  }, 3500);
+
+  // Après 5s, afficher message d'aide
   setTimeout(() => {
     if (document.visibilityState === 'visible' && scannerJustOpened) {
       scannerJustOpened = false;
       document.getElementById('paste-hint').style.display = 'block';
-      toast('Scanner non détecté — scannez manuellement puis collez', 'warn');
+      toast('Aucun scanner détecté — scannez puis collez le résultat', 'warn');
     }
-  }, 3500);
+  }, 5000);
 }
 
 // Quand on revient sur la page après le scanner
@@ -1180,61 +1222,291 @@ const FIELD_ROWS = {
   atelier:      18,  // Atelier IS2
 };
 
-function buildXLSX(mode) {
+// ── Manipulation directe du ZIP sans dépendance externe ──
+// Utilise DecompressionStream/CompressionStream natifs (Chrome/Android 80+)
+// ─────────────────────────────────────────────────────────────────────────
+// Mini ZIP parser/builder 100% natif
+
+// Décompresse des données deflate brutes
+async function inflateRaw(data) {
+  const ds = new DecompressionStream('deflate-raw');
+  const writer = ds.writable.getWriter();
+  const reader = ds.readable.getReader();
+  writer.write(data);
+  writer.close();
+  const chunks = [];
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    chunks.push(value);
+  }
+  const total = chunks.reduce((s, c) => s + c.length, 0);
+  const out = new Uint8Array(total);
+  let off = 0;
+  for (const c of chunks) { out.set(c, off); off += c.length; }
+  return out;
+}
+
+// Compresse en deflate brut
+async function deflateRaw(data) {
+  const cs = new CompressionStream('deflate-raw');
+  const writer = cs.writable.getWriter();
+  const reader = cs.readable.getReader();
+  writer.write(data);
+  writer.close();
+  const chunks = [];
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    chunks.push(value);
+  }
+  const total = chunks.reduce((s, c) => s + c.length, 0);
+  const out = new Uint8Array(total);
+  let off = 0;
+  for (const c of chunks) { out.set(c, off); off += c.length; }
+  return out;
+}
+
+// CRC32
+const CRC32_TABLE = (() => {
+  const t = new Uint32Array(256);
+  for (let i = 0; i < 256; i++) {
+    let c = i;
+    for (let j = 0; j < 8; j++) c = (c & 1) ? 0xEDB88320 ^ (c >>> 1) : c >>> 1;
+    t[i] = c;
+  }
+  return t;
+})();
+function crc32(data) {
+  let c = 0xFFFFFFFF;
+  for (let i = 0; i < data.length; i++) c = CRC32_TABLE[(c ^ data[i]) & 0xFF] ^ (c >>> 8);
+  return (c ^ 0xFFFFFFFF) >>> 0;
+}
+
+// Lire un entier little-endian depuis un DataView
+function ru32(view, off) { return view.getUint32(off, true); }
+function ru16(view, off) { return view.getUint16(off, true); }
+
+// Écrire un entier little-endian dans un buffer
+function wu16(buf, off, v) { buf[off] = v & 0xFF; buf[off+1] = (v >> 8) & 0xFF; }
+function wu32(buf, off, v) { buf[off] = v & 0xFF; buf[off+1] = (v >> 8) & 0xFF; buf[off+2] = (v >> 16) & 0xFF; buf[off+3] = (v >> 24) & 0xFF; }
+
+const enc = new TextEncoder(), dec = new TextDecoder('utf-8');
+
+// Parser le ZIP et retourner un tableau d'entrées {name, compressType, compressedData, crc, uncompressedSize, localHeaderOffset}
+async function zipParse(bytes) {
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  // Trouver End Of Central Directory
+  let eocd = -1;
+  for (let i = bytes.length - 22; i >= 0; i--) {
+    if (ru32(view, i) === 0x06054B50) { eocd = i; break; }
+  }
+  if (eocd < 0) throw new Error('ZIP EOCD not found');
+  const cdOffset = ru32(view, eocd + 16);
+  const cdCount  = ru16(view, eocd + 10);
+  const entries = [];
+  let pos = cdOffset;
+  for (let i = 0; i < cdCount; i++) {
+    const sig = ru32(view, pos);
+    if (sig !== 0x02014B50) throw new Error('Bad CD signature');
+    const compressType     = ru16(view, pos + 10);
+    const crc              = ru32(view, pos + 16);
+    const compressedSize   = ru32(view, pos + 20);
+    const uncompressedSize = ru32(view, pos + 24);
+    const nameLen          = ru16(view, pos + 28);
+    const extraLen         = ru16(view, pos + 30);
+    const commentLen       = ru16(view, pos + 32);
+    const localOff         = ru32(view, pos + 42);
+    const name             = dec.decode(bytes.slice(pos + 46, pos + 46 + nameLen));
+    entries.push({ name, compressType, crc, compressedSize, uncompressedSize, localHeaderOffset: localOff });
+    pos += 46 + nameLen + extraLen + commentLen;
+  }
+  // Lire les données compressées depuis les local headers
+  for (const e of entries) {
+    const lh = e.localHeaderOffset;
+    const lNameLen  = ru16(view, lh + 26);
+    const lExtraLen = ru16(view, lh + 28);
+    const dataStart = lh + 30 + lNameLen + lExtraLen;
+    e.compressedData = bytes.slice(dataStart, dataStart + e.compressedSize);
+  }
+  return entries;
+}
+
+// Décompresser une entrée ZIP
+async function zipReadText(entry) {
+  if (entry.compressType === 0) return dec.decode(entry.compressedData);
+  const raw = await inflateRaw(entry.compressedData);
+  return dec.decode(raw);
+}
+
+// Reconstruire un ZIP à partir d'entrées (modifiées ou non)
+async function zipBuild(entries) {
+  const localHeaders = [];
+  let offset = 0;
+  const parts = [];
+
+  for (const e of entries) {
+    const nameBytes = enc.encode(e.name);
+    // Toujours recompresser en deflate si le contenu a été modifié, sinon garder tel quel
+    let compressedData, crc, uncompressedSize, compressType;
+    if (e.newContent !== undefined) {
+      const rawBytes = enc.encode(e.newContent);
+      uncompressedSize = rawBytes.length;
+      crc = crc32(rawBytes);
+      compressedData = await deflateRaw(rawBytes);
+      compressType = 8;
+    } else {
+      compressedData  = e.compressedData;
+      crc             = e.crc;
+      uncompressedSize = e.uncompressedSize;
+      compressType    = e.compressType;
+    }
+
+    const localHeader = new Uint8Array(30 + nameBytes.length);
+    wu32(localHeader,  0, 0x04034B50);
+    wu16(localHeader,  4, 20);   // version needed
+    wu16(localHeader,  6, 0);    // flags
+    wu16(localHeader,  8, compressType);
+    wu16(localHeader, 10, 0);    // mod time
+    wu16(localHeader, 12, 0);    // mod date
+    wu32(localHeader, 14, crc);
+    wu32(localHeader, 18, compressedData.length);
+    wu32(localHeader, 22, uncompressedSize);
+    wu16(localHeader, 26, nameBytes.length);
+    wu16(localHeader, 28, 0);    // extra len
+    localHeader.set(nameBytes, 30);
+
+    localHeaders.push({ offset, nameBytes, compressType, crc, compressedSize: compressedData.length, uncompressedSize });
+    parts.push(localHeader, compressedData);
+    offset += localHeader.length + compressedData.length;
+  }
+
+  const cdStart = offset;
+  for (let i = 0; i < entries.length; i++) {
+    const { offset: lhOff, nameBytes, compressType, crc, compressedSize, uncompressedSize } = localHeaders[i];
+    const cd = new Uint8Array(46 + nameBytes.length);
+    wu32(cd,  0, 0x02014B50);
+    wu16(cd,  4, 20); wu16(cd, 6, 20); wu16(cd, 8, 0);
+    wu16(cd, 10, compressType);
+    wu16(cd, 12, 0); wu16(cd, 14, 0);
+    wu32(cd, 16, crc);
+    wu32(cd, 20, compressedSize);
+    wu32(cd, 24, uncompressedSize);
+    wu16(cd, 28, nameBytes.length);
+    wu16(cd, 30, 0); wu16(cd, 32, 0); wu16(cd, 34, 0); wu16(cd, 36, 0); wu16(cd, 38, 0);
+    wu32(cd, 42, lhOff);
+    cd.set(nameBytes, 46);
+    parts.push(cd);
+    offset += cd.length;
+  }
+
+  const eocd = new Uint8Array(22);
+  wu32(eocd,  0, 0x06054B50);
+  wu16(eocd,  4, 0); wu16(eocd,  6, 0);
+  wu16(eocd,  8, entries.length);
+  wu16(eocd, 10, entries.length);
+  wu32(eocd, 12, offset - cdStart);
+  wu32(eocd, 16, cdStart);
+  wu16(eocd, 20, 0);
+  parts.push(eocd);
+
+  const total = parts.reduce((s, p) => s + p.length, 0);
+  const out = new Uint8Array(total);
+  let pos = 0;
+  for (const p of parts) { out.set(p, pos); pos += p.length; }
+  return out;
+}
+
+async function buildXLSXBlob(mode) {
   const rows = mode === 'wagon' ? getByWagon(state.wagon) : loadDB();
   if (!rows.length) return null;
 
-  // Décoder le template base64
-  const binary  = atob(XLSX_TEMPLATE_B64);
-  const bytes   = new Uint8Array(binary.length);
+  // Décoder le template
+  const binary = atob(XLSX_TEMPLATE_B64);
+  const bytes  = new Uint8Array(binary.length);
   for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
 
-  const wb = XLSX.read(bytes, { type: 'array', cellStyles: true });
-  const ws = wb.Sheets[wb.SheetNames[0]];
+  const entries = await zipParse(bytes);
 
-  // Écriture préservant le style original (bordures, police, alignement)
-  // On ne touche que t (type) et v (valeur) — les autres props (s, z...) restent
-  function setCellValue(address, value) {
-    const existing = ws[address] || {};
-    ws[address] = Object.assign({}, existing, { t: 's', v: String(value), w: undefined });
+  // Lire sheet1.xml et sharedStrings.xml
+  const ssEntry = entries.find(e => e.name === 'xl/sharedStrings.xml');
+  const wsEntry = entries.find(e => e.name === 'xl/worksheets/sheet1.xml');
+  let ssXml = await zipReadText(ssEntry);
+  let wsXml = await zipReadText(wsEntry);
+
+  // ── Parser les sharedStrings existantes ──
+  const siItems = [...ssXml.matchAll(/<si>(.*?)<\/si>/gs)].map(m => m[1]);
+  const ssMap   = {};
+  siItems.forEach((si, i) => {
+    const txt = si.replace(/<[^>]+>/g, '').trim();
+    ssMap[txt] = i;
+  });
+  let newSS = [...siItems];
+
+  function getOrAddString(val) {
+    const s = String(val);
+    if (ssMap[s] !== undefined) return ssMap[s];
+    const idx = newSS.length;
+    ssMap[s]  = idx;
+    newSS.push(`<t>${s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}</t>`);
+    return idx;
   }
 
-  // Écrire le N° de wagon en A7
-  setCellValue('A7', state.wagon);
-
-  // Écrire le détenteur en D9 (premier essieu)
-  if (rows[0]?.detenteur) {
-    setCellValue('D9', rows[0].detenteur);
+  // ── Injecter valeur dans cellule en conservant l'attribut s= (style) ──
+  function injectCell(xml, addr, val) {
+    const s = String(val);
+    const ssIdx = getOrAddString(s);
+    // Chercher cellule existante <c r="ADDR" ...>...</c> ou <c r="ADDR" .../>
+    const re = new RegExp(`(<c r="${addr}"([^>]*?))(\s*/>|>.*?<\/c>)`, 's');
+    const m  = xml.match(re);
+    if (m) {
+      const styleAttr = (m[2].match(/s="\d+"/) || [''])[0];
+      const newCell   = `<c r="${addr}" ${styleAttr} t="s"><v>${ssIdx}</v></c>`;
+      return xml.replace(re, newCell);
+    }
+    return xml;
   }
 
-  // Écrire les données de chaque essieu
+  let xml = wsXml;
+
+  // N° wagon en A7
+  xml = injectCell(xml, 'A7', state.wagon);
+
+  // Détenteur en D9
+  if (rows[0]?.detenteur) xml = injectCell(xml, 'D9', rows[0].detenteur);
+
+  // Données essieux
   rows.forEach(r => {
     const col = ESSIEU_COLS[r.essieu_index];
-    if (!col) return; // Max 4 essieux sur ce formulaire
-
+    if (!col) return;
     const set = (row, val) => {
-      if (val !== undefined && val !== null && val !== '') {
-        setCellValue(`${col}${row}`, String(val));
-      }
+      if (val != null && val !== '') xml = injectCell(xml, `${col}${row}`, val);
     };
-
-    set(FIELD_ROWS.sn,           r.sn);
-    set(FIELD_ROWS.type,         r.type);
-    set(FIELD_ROWS.detenteur,    r.detenteur);
-    set(FIELD_ROWS.date_revision,r.date_revision);
-    set(FIELD_ROWS.atelier,      r.atelier);
+    set(FIELD_ROWS.sn,            r.sn);
+    set(FIELD_ROWS.type,          r.type);
+    set(FIELD_ROWS.detenteur,     r.detenteur);
+    set(FIELD_ROWS.date_revision, r.date_revision);
+    set(FIELD_ROWS.atelier,       r.atelier);
   });
 
-  // Générer le fichier
-  const out      = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
-  const blob     = new Blob([out], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-  const filename = `formulaire_${state.wagon.replace(/\s/g,'_')}_${new Date().toISOString().slice(0,10)}.xlsx`;
+  // Mettre à jour sheet1.xml et sharedStrings.xml dans le ZIP natif
+  wsEntry.newContent = xml;
+  const newSsXml = ssXml.replace(
+    /<sst[^>]*>.*<\/sst>/s,
+    `<sst xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" count="${newSS.length}" uniqueCount="${newSS.length}">${newSS.map(si => `<si>${si}</si>`).join('')}</sst>`
+  );
+  ssEntry.newContent = newSsXml;
+
+  const out  = await zipBuild(entries);
+  const blob = new Blob([out], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+  const wagon = (mode === 'wagon' ? state.wagon : 'historique');
+  const filename = `formulaire_${wagon.replace(/\s/g,'_')}_${new Date().toISOString().slice(0,10)}.xlsx`;
   return { blob, filename };
 }
 
-function exportXLSX(mode) {
+async function exportXLSX(mode) {
   try {
-    const result = buildXLSX(mode);
+    const result = await buildXLSXBlob(mode);
     if (!result) { toast('Aucune donnée à exporter', 'error'); return; }
     const { blob, filename } = result;
     const url = URL.createObjectURL(blob);
@@ -1242,7 +1514,7 @@ function exportXLSX(mode) {
     a.href = url; a.download = filename;
     document.body.appendChild(a); a.click();
     document.body.removeChild(a);
-    URL.revokeObjectURL(url);
+    setTimeout(() => URL.revokeObjectURL(url), 2000);
     toast('Formulaire Excel téléchargé ✓', 'success');
   } catch(e) {
     console.error(e);
@@ -1252,7 +1524,7 @@ function exportXLSX(mode) {
 
 async function shareXLSX(mode) {
   try {
-    const result = buildXLSX(mode);
+    const result = await buildXLSXBlob(mode);
     if (!result) { toast('Aucune donnée à exporter', 'error'); return; }
     const { blob, filename } = result;
 
@@ -1272,38 +1544,106 @@ async function shareXLSX(mode) {
       }
     }
 
-    // Méthode 2 : Web Share API Level 1 sans fichier (lien de données)
-    // On crée une URL objet et on partage le lien
+    // Méthode 2 : Web Share API Level 1 (télécharge + menu partage texte)
     if (navigator.share) {
-      // Télécharge d'abord le fichier, puis partage par texte
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
-      a.href = url;
-      a.download = filename;
+      a.href = url; a.download = filename;
       a.click();
       setTimeout(() => URL.revokeObjectURL(url), 2000);
-
-      // Tenter aussi le partage texte pour suggérer le fichier
       try {
         await navigator.share({
           title: `Formulaire wagon ${state.wagon}`,
           text: `Signalement essieux — wagon ${state.wagon}\n(Joindre le fichier téléchargé : ${filename})`,
         });
       } catch(e2) { /* ignoré */ }
-
       toast('Fichier téléchargé — ajoutez-le en pièce jointe', 'info');
       return;
     }
 
     // Méthode 3 : Fallback simple — téléchargement
-    exportXLSX(mode);
+    await exportXLSX(mode);
     toast('Fichier téléchargé — envoyez-le manuellement', 'info');
 
   } catch(e) {
-    if (e.name === 'AbortError') return; // Utilisateur a annulé
-    // En cas d'erreur inattendue, fallback téléchargement
-    exportXLSX(mode);
+    if (e.name === 'AbortError') return;
+    await exportXLSX(mode);
   }
+}
+
+// ── Dialogue de choix : Formulaire Excel ou Historique CSV ──
+function showShareDialog() {
+  // Créer un overlay modal
+  const overlay = document.createElement('div');
+  overlay.id = 'share-dialog';
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9999;display:flex;align-items:flex-end;justify-content:center;padding-bottom:env(safe-area-inset-bottom,0)';
+  overlay.innerHTML = `
+    <div style="background:var(--bg-2);border-radius:20px 20px 0 0;width:100%;max-width:480px;padding:20px 20px 28px">
+      <div style="width:40px;height:4px;background:var(--border);border-radius:2px;margin:0 auto 18px"></div>
+      <div style="font-family:var(--fd);font-size:1rem;font-weight:800;margin-bottom:16px;color:var(--t1)">Envoyer par mail</div>
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <button class="btn btn-amber" onclick="closeShareDialog();shareXLSX('wagon')" style="justify-content:flex-start;gap:14px">
+          <span style="font-size:1.4rem">📊</span>
+          <div style="text-align:left">
+            <div style="font-size:.9rem;font-weight:700">Formulaire Excel</div>
+            <div style="font-size:.72rem;font-weight:400;opacity:.75;text-transform:none;letter-spacing:0">Wagon ${state.wagon} — mise en forme complète</div>
+          </div>
+        </button>
+        <button class="btn btn-ghost" onclick="closeShareDialog();shareCSV('wagon')" style="justify-content:flex-start;gap:14px">
+          <span style="font-size:1.4rem">📋</span>
+          <div style="text-align:left">
+            <div style="font-size:.9rem;font-weight:700">Historique CSV (ce wagon)</div>
+            <div style="font-size:.72rem;font-weight:400;opacity:.75;text-transform:none;letter-spacing:0">Tous les essieux de ce wagon</div>
+          </div>
+        </button>
+        <button class="btn btn-ghost" onclick="closeShareDialog();shareCSV('all')" style="justify-content:flex-start;gap:14px">
+          <span style="font-size:1.4rem">🗂</span>
+          <div style="text-align:left">
+            <div style="font-size:.9rem;font-weight:700">Historique complet</div>
+            <div style="font-size:.72rem;font-weight:400;opacity:.75;text-transform:none;letter-spacing:0">Tous les wagons enregistrés</div>
+          </div>
+        </button>
+        <button class="btn btn-ghost btn-sm" onclick="closeShareDialog()" style="margin-top:4px;color:var(--t3)">Annuler</button>
+      </div>
+    </div>`;
+  overlay.addEventListener('click', e => { if (e.target === overlay) closeShareDialog(); });
+  document.body.appendChild(overlay);
+}
+
+function closeShareDialog() {
+  const d = document.getElementById('share-dialog');
+  if (d) d.remove();
+}
+
+// ── Dialogue "Envoyer par mail" depuis l'écran Historique
+function showShareDialogHistory() {
+  const overlay = document.createElement('div');
+  overlay.id = 'share-dialog';
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9999;display:flex;align-items:flex-end;justify-content:center;padding-bottom:env(safe-area-inset-bottom,0)';
+  overlay.innerHTML = `
+    <div style="background:var(--bg-2);border-radius:20px 20px 0 0;width:100%;max-width:480px;padding:20px 20px 28px">
+      <div style="width:40px;height:4px;background:var(--border);border-radius:2px;margin:0 auto 18px"></div>
+      <div style="font-family:var(--fd);font-size:1rem;font-weight:800;margin-bottom:16px;color:var(--t1)">Envoyer par mail</div>
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <button class="btn btn-amber" onclick="closeShareDialog();shareXLSX('all')" style="justify-content:flex-start;gap:14px">
+          <span style="font-size:1.4rem">📊</span>
+          <div style="text-align:left">
+            <div style="font-size:.9rem;font-weight:700">Formulaire Excel</div>
+            <div style="font-size:.72rem;font-weight:400;opacity:.75;text-transform:none;letter-spacing:0">Tous les wagons — mise en forme complète</div>
+          </div>
+        </button>
+        <button class="btn btn-ghost" onclick="closeShareDialog();shareCSV('all')" style="justify-content:flex-start;gap:14px">
+          <span style="font-size:1.4rem">🗂</span>
+          <div style="text-align:left">
+            <div style="font-size:.9rem;font-weight:700">Historique CSV complet</div>
+            <div style="font-size:.72rem;font-weight:400;opacity:.75;text-transform:none;letter-spacing:0">Tous les wagons enregistrés</div>
+          </div>
+        </button>
+        <button class="btn btn-ghost btn-sm" onclick="closeShareDialog()" style="margin-top:4px;color:var(--t3)">Annuler</button>
+      </div>
+    </div>`;
+  overlay.addEventListener('click', e => { if (e.target === overlay) closeShareDialog(); });
+  document.body.appendChild(overlay);
 }
 
 </script>
