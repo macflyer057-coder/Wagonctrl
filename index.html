@@ -1192,12 +1192,19 @@ function buildXLSX(mode) {
   const wb = XLSX.read(bytes, { type: 'array', cellStyles: true });
   const ws = wb.Sheets[wb.SheetNames[0]];
 
+  // Écriture préservant le style original (bordures, police, alignement)
+  // On ne touche que t (type) et v (valeur) — les autres props (s, z...) restent
+  function setCellValue(address, value) {
+    const existing = ws[address] || {};
+    ws[address] = Object.assign({}, existing, { t: 's', v: String(value), w: undefined });
+  }
+
   // Écrire le N° de wagon en A7
-  ws['A7'] = { t: 's', v: state.wagon };
+  setCellValue('A7', state.wagon);
 
   // Écrire le détenteur en D9 (premier essieu)
   if (rows[0]?.detenteur) {
-    ws['D9'] = { t: 's', v: rows[0].detenteur };
+    setCellValue('D9', rows[0].detenteur);
   }
 
   // Écrire les données de chaque essieu
@@ -1207,7 +1214,7 @@ function buildXLSX(mode) {
 
     const set = (row, val) => {
       if (val !== undefined && val !== null && val !== '') {
-        ws[`${col}${row}`] = { t: 's', v: String(val) };
+        setCellValue(`${col}${row}`, String(val));
       }
     };
 
