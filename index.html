@@ -1122,23 +1122,31 @@ async function shareCSV(mode) {
   const file = new File([blob], filename, { type: 'text/csv' });
 
   try {
-    // Web Share API avec fichier — ouvre le sélecteur d'apps Android
-    if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
-      await navigator.share({ files: [file] });
-      toast('Fichier partagé ✓', 'success');
-      return;
-    }
-
-    // Fallback texte si fichier non supporté
     if (navigator.share) {
-      shareAsText(mode, rows);
-      return;
+      // Essayer share avec fichier directement
+      try {
+        await navigator.share({ files: [file] });
+        toast('Fichier partagé ✓', 'success');
+        return;
+      } catch(shareErr) {
+        if (shareErr.name === 'AbortError') return;
+        // Fichier non supporté → télécharger + ouvrir sélecteur texte
+        exportCSV(mode);
+        try {
+          await navigator.share({
+            title: mode === 'wagon' ? `Contrôle wagon ${state.wagon}` : 'Export WagonCtrl',
+            text: `Données exportées — fichier téléchargé : ${filename}`,
+          });
+        } catch(e2) { if (e2.name === 'AbortError') return; }
+        toast('Fichier téléchargé — joignez-le au mail', 'info');
+        return;
+      }
     }
   } catch(e) {
-    if (e.name === 'AbortError') return; // Utilisateur a annulé
+    if (e.name === 'AbortError') return;
   }
 
-  // Dernier fallback : téléchargement
+  // Dernier fallback : téléchargement simple
   exportCSV(mode);
   toast('Fichier téléchargé — envoyez-le manuellement', 'info');
 }
@@ -1603,17 +1611,37 @@ async function showShareDialog() {
       if (!_prebuiltXLSX) { toast('Erreur de génération', 'error'); return; }
       const { blob, filename } = _prebuiltXLSX;
       const file = new File([blob], filename, { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-      if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
-        await navigator.share({ files: [file] });
-        toast('Fichier partagé ✓', 'success');
-      } else {
-        // Fallback téléchargement
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a'); a.href = url; a.download = filename;
-        document.body.appendChild(a); a.click(); document.body.removeChild(a);
-        setTimeout(() => URL.revokeObjectURL(url), 2000);
-        toast('Fichier téléchargé — envoyez-le manuellement', 'info');
+      // Essayer share avec fichier directement (sans vérifier canShare)
+      if (navigator.share) {
+        try {
+          await navigator.share({ files: [file] });
+          toast('Fichier partagé ✓', 'success');
+          return;
+        } catch(shareErr) {
+          if (shareErr.name === 'AbortError') return; // annulé par l'utilisateur
+          // share avec fichier non supporté → essayer sans fichier
+          try {
+            // Télécharger le fichier en même temps
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a'); a.href = url; a.download = filename;
+            document.body.appendChild(a); a.click(); document.body.removeChild(a);
+            setTimeout(() => URL.revokeObjectURL(url), 2000);
+            // Ouvrir le sélecteur d'apps avec texte
+            await navigator.share({
+              title: `Formulaire wagon ${state.wagon}`,
+              text: `Signalement essieux wagon ${state.wagon} — fichier téléchargé : ${filename}`,
+            });
+            toast('Fichier téléchargé — joignez-le au mail', 'info');
+            return;
+          } catch(e2) { if (e2.name === 'AbortError') return; }
+        }
       }
+      // Dernier fallback : simple téléchargement
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a'); a.href = url; a.download = filename;
+      document.body.appendChild(a); a.click(); document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(url), 2000);
+      toast('Fichier téléchargé dans Téléchargements', 'info');
     } catch(e) {
       if (e.name !== 'AbortError') { console.error(e); await exportXLSX('wagon'); }
     }
