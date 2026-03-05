@@ -788,23 +788,34 @@ let scannerJustOpened = false;
 function openScanner() {
   scannerJustOpened = true;
 
-  // Intent Android pour ouvrir l'app Scanner Xiaomi
-  // Tente plusieurs intents connus du scanner Xiaomi / MIUI
-  const intents = [
-    'intent://scan/#Intent;scheme=zxing;package=com.xiaomi.scanner;end',
-    'intent://scan/#Intent;scheme=zxing;package=com.google.zxing.client.android;end',
-    'zxing://scan/',
-  ];
+  // Méthode 1 : lien <a> avec intent URI (plus fiable que location.href)
+  function tryIntent(uri) {
+    const a = document.createElement('a');
+    a.href = uri;
+    a.style.display = 'none';
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(() => document.body.removeChild(a), 500);
+  }
 
-  // On essaie le premier intent (Xiaomi natif)
-  window.location.href = intents[0];
+  // Essaie Xiaomi Scanner d'abord
+  tryIntent('intent://scan/#Intent;scheme=zxing;package=com.xiaomi.scanner;end');
 
-  // Fallback après 1.5s si l'app ne s'ouvre pas : essayer zxing générique
+  // Après 1.8s, si on est toujours visible (app pas ouverte), essayer zxing générique
   setTimeout(() => {
     if (document.visibilityState === 'visible' && scannerJustOpened) {
-      window.location.href = intents[2];
+      tryIntent('zxing://scan/');
     }
-  }, 1500);
+  }, 1800);
+
+  // Après 3.5s, si toujours visible, montrer message d'aide
+  setTimeout(() => {
+    if (document.visibilityState === 'visible' && scannerJustOpened) {
+      scannerJustOpened = false;
+      document.getElementById('paste-hint').style.display = 'block';
+      toast('Scanner non détecté — scannez manuellement puis collez', 'warn');
+    }
+  }, 3500);
 }
 
 // Quand on revient sur la page après le scanner
@@ -1140,8 +1151,8 @@ function toast(msg, type = 'info') {
   const el   = document.getElementById('toast');
   const icon = document.getElementById('toast-icon');
   const txt  = document.getElementById('toast-msg');
-  const colors = { success: 'var(--green)', error: 'var(--red)', info: 'var(--amber)' };
-  const icons  = { success: '✓', error: '✕', info: 'ℹ' };
+  const colors = { success: 'var(--green)', error: 'var(--red)', info: 'var(--amber)', warn: '#f59e0b' };
+  const icons  = { success: '✓', error: '✕', info: 'ℹ', warn: '⚠' };
 
   icon.textContent = icons[type] || 'ℹ';
   icon.style.color = colors[type] || 'var(--amber)';
@@ -1181,8 +1192,8 @@ function buildXLSX(mode) {
   const wb = XLSX.read(bytes, { type: 'array', cellStyles: true });
   const ws = wb.Sheets[wb.SheetNames[0]];
 
-  // Écrire le N° de wagon en D7
-  ws['D7'] = { t: 's', v: state.wagon };
+  // Écrire le N° de wagon en A7
+  ws['A7'] = { t: 's', v: state.wagon };
 
   // Écrire le détenteur en D9 (premier essieu)
   if (rows[0]?.detenteur) {
@@ -1237,23 +1248,54 @@ async function shareXLSX(mode) {
     const result = buildXLSX(mode);
     if (!result) { toast('Aucune donnée à exporter', 'error'); return; }
     const { blob, filename } = result;
-    const file = new File([blob], filename, {
-      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-    });
 
-    if (navigator.canShare && navigator.canShare({ files: [file] })) {
-      await navigator.share({
-        title: `Formulaire wagon ${state.wagon}`,
-        text:  `Signalement essieux — wagon ${state.wagon}`,
-        files: [file],
+    // Méthode 1 : Web Share API Level 2 avec fichier joint
+    if (navigator.canShare) {
+      const file = new File([blob], filename, {
+        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
       });
-      toast('Formulaire partagé ✓', 'success');
-    } else {
-      // Fallback : téléchargement
-      exportXLSX(mode);
+      if (navigator.canShare({ files: [file] })) {
+        await navigator.share({
+          title: `Formulaire wagon ${state.wagon}`,
+          text:  `Signalement essieux — wagon ${state.wagon}`,
+          files: [file],
+        });
+        toast('Formulaire partagé ✓', 'success');
+        return;
+      }
     }
+
+    // Méthode 2 : Web Share API Level 1 sans fichier (lien de données)
+    // On crée une URL objet et on partage le lien
+    if (navigator.share) {
+      // Télécharge d'abord le fichier, puis partage par texte
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(url), 2000);
+
+      // Tenter aussi le partage texte pour suggérer le fichier
+      try {
+        await navigator.share({
+          title: `Formulaire wagon ${state.wagon}`,
+          text: `Signalement essieux — wagon ${state.wagon}\n(Joindre le fichier téléchargé : ${filename})`,
+        });
+      } catch(e2) { /* ignoré */ }
+
+      toast('Fichier téléchargé — ajoutez-le en pièce jointe', 'info');
+      return;
+    }
+
+    // Méthode 3 : Fallback simple — téléchargement
+    exportXLSX(mode);
+    toast('Fichier téléchargé — envoyez-le manuellement', 'info');
+
   } catch(e) {
-    if (e.name !== 'AbortError') exportXLSX(mode);
+    if (e.name === 'AbortError') return; // Utilisateur a annulé
+    // En cas d'erreur inattendue, fallback téléchargement
+    exportXLSX(mode);
   }
 }
 
