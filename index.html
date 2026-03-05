@@ -1113,7 +1113,7 @@ function exportCSV(mode) {
   toast(`CSV téléchargé : ${filename}`, 'success');
 }
 
-// Partage natif Android (mail, WhatsApp, Drive…)
+// Partage natif Android — ouvre le sélecteur d'applications
 async function shareCSV(mode) {
   const result = buildCSV(mode);
   if (!result) { toast('Aucune donnée à exporter', 'error'); return; }
@@ -1121,41 +1121,32 @@ async function shareCSV(mode) {
 
   const file = new File([blob], filename, { type: 'text/csv' });
 
-  // Web Share API niveau 2 — partage de fichier natif
-  if (navigator.canShare && navigator.canShare({ files: [file] })) {
-    try {
-      await navigator.share({
-        title:  'WagonCtrl — Export contrôle',
-        text:   mode === 'wagon'
-          ? `Contrôle wagon ${state.wagon} — ${rows.length} essieu(x)`
-          : `Export complet WagonCtrl — ${rows.length} enregistrement(s)`,
-        files:  [file],
-      });
+  try {
+    // Web Share API avec fichier — ouvre le sélecteur d'apps Android
+    if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
+      await navigator.share({ files: [file] });
       toast('Fichier partagé ✓', 'success');
-    } catch(err) {
-      if (err.name !== 'AbortError') {
-        // Partage fichier refusé → fallback texte
-        shareAsText(mode, rows);
-      }
+      return;
     }
-    return;
+
+    // Fallback texte si fichier non supporté
+    if (navigator.share) {
+      shareAsText(mode, rows);
+      return;
+    }
+  } catch(e) {
+    if (e.name === 'AbortError') return; // Utilisateur a annulé
   }
 
-  // Fallback : Web Share API niveau 1 (texte seulement, sans fichier)
-  if (navigator.share) {
-    shareAsText(mode, rows);
-    return;
-  }
-
-  // Dernier fallback : téléchargement classique
-  toast('Partage non supporté — téléchargement du fichier', 'info');
+  // Dernier fallback : téléchargement
   exportCSV(mode);
+  toast('Fichier téléchargé — envoyez-le manuellement', 'info');
 }
 
-// Fallback : ouvre l'app mail avec le CSV dans le corps du message
+// Fallback : partage CSV en texte via navigator.share
 function shareAsText(mode, rows) {
   const header  = 'wagon;essieu_index;numero_serie;type;tonnage;detenteur;date_revision;atelier\n';
-  const content = rows.map(r =>
+  const csvContent = rows.map(r =>
     [r.wagon, r.essieu_index, r.sn||'', r.type||'',
      r.tonnage||'', r.detenteur||'', r.date_revision||'', r.atelier||''].join(';')
   ).join('\n');
@@ -1164,15 +1155,10 @@ function shareAsText(mode, rows) {
     ? `Contrôle wagon ${state.wagon}`
     : `Export WagonCtrl ${new Date().toLocaleDateString('fr-FR')}`;
 
-  const body = `Bonjour,\n\nVeuillez trouver ci-dessous les données de contrôle :\n\n${header}${content}\n\nEnvoyé depuis WagonCtrl`;
-
   navigator.share({
     title: subject,
-    text:  body,
-  }).catch(() => {
-    // Si même ça échoue, on télécharge
-    exportCSV(mode);
-  });
+    text:  `${header}${csvContent}`,
+  }).catch(() => exportCSV(mode));
 }
 
 /* ── NEW CONTROL ────────────────────────────────────────── */
@@ -1524,90 +1510,128 @@ async function exportXLSX(mode) {
 
 async function shareXLSX(mode) {
   try {
+    // Afficher un indicateur de chargement pendant la génération
+    toast('Génération du fichier…', 'info');
     const result = await buildXLSXBlob(mode);
     if (!result) { toast('Aucune donnée à exporter', 'error'); return; }
     const { blob, filename } = result;
 
-    // Méthode 1 : Web Share API Level 2 avec fichier joint
-    if (navigator.canShare) {
-      const file = new File([blob], filename, {
-        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-      });
-      if (navigator.canShare({ files: [file] })) {
-        await navigator.share({
-          title: `Formulaire wagon ${state.wagon}`,
-          text:  `Signalement essieux — wagon ${state.wagon}`,
-          files: [file],
-        });
-        toast('Formulaire partagé ✓', 'success');
-        return;
-      }
-    }
+    const file = new File([blob], filename, {
+      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    });
 
-    // Méthode 2 : Web Share API Level 1 (télécharge + menu partage texte)
-    if (navigator.share) {
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url; a.download = filename;
-      a.click();
-      setTimeout(() => URL.revokeObjectURL(url), 2000);
-      try {
-        await navigator.share({
-          title: `Formulaire wagon ${state.wagon}`,
-          text: `Signalement essieux — wagon ${state.wagon}\n(Joindre le fichier téléchargé : ${filename})`,
-        });
-      } catch(e2) { /* ignoré */ }
-      toast('Fichier téléchargé — ajoutez-le en pièce jointe', 'info');
+    // Web Share API avec fichier — ouvre le sélecteur d'apps Android
+    if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
+      await navigator.share({ files: [file] });
+      toast('Fichier partagé ✓', 'success');
       return;
     }
 
-    // Méthode 3 : Fallback simple — téléchargement
-    await exportXLSX(mode);
+    // Fallback : téléchargement direct
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = filename;
+    document.body.appendChild(a); a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 2000);
     toast('Fichier téléchargé — envoyez-le manuellement', 'info');
 
   } catch(e) {
-    if (e.name === 'AbortError') return;
+    if (e.name === 'AbortError') return; // Utilisateur a annulé
+    console.error(e);
+    toast('Erreur — fichier téléchargé à la place', 'error');
     await exportXLSX(mode);
   }
 }
 
-// ── Dialogue de choix : Formulaire Excel ou Historique CSV ──
-function showShareDialog() {
-  // Créer un overlay modal
+// ── Dialogue de choix + pré-génération du fichier Excel ──
+// Le fichier est pré-généré en arrière-plan pendant que l'utilisateur choisit.
+// Au clic, navigator.share() est appelé SYNCHRONIQUEMENT dans le geste → Android ouvre le sélecteur.
+let _prebuiltXLSX = null; // { blob, filename } pré-générés
+
+async function showShareDialog() {
+  // Lancer la génération XLSX en arrière-plan immédiatement
+  _prebuiltXLSX = null;
+  buildXLSXBlob('wagon').then(r => { _prebuiltXLSX = r; }).catch(() => {});
+
   const overlay = document.createElement('div');
   overlay.id = 'share-dialog';
-  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9999;display:flex;align-items:flex-end;justify-content:center;padding-bottom:env(safe-area-inset-bottom,0)';
+  overlay.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9999;display:flex;align-items:flex-end;justify-content:center';
   overlay.innerHTML = `
-    <div style="background:var(--bg-2);border-radius:20px 20px 0 0;width:100%;max-width:480px;padding:20px 20px 28px">
+    <div style="background:var(--bg-2);border-radius:20px 20px 0 0;width:100%;max-width:480px;padding:20px 20px 32px">
       <div style="width:40px;height:4px;background:var(--border);border-radius:2px;margin:0 auto 18px"></div>
       <div style="font-family:var(--fd);font-size:1rem;font-weight:800;margin-bottom:16px;color:var(--t1)">Envoyer par mail</div>
       <div style="display:flex;flex-direction:column;gap:10px">
-        <button class="btn btn-amber" onclick="closeShareDialog();shareXLSX('wagon')" style="justify-content:flex-start;gap:14px">
+        <button class="btn btn-amber" id="sd-xlsx" style="justify-content:flex-start;gap:14px">
           <span style="font-size:1.4rem">📊</span>
           <div style="text-align:left">
             <div style="font-size:.9rem;font-weight:700">Formulaire Excel</div>
             <div style="font-size:.72rem;font-weight:400;opacity:.75;text-transform:none;letter-spacing:0">Wagon ${state.wagon} — mise en forme complète</div>
           </div>
         </button>
-        <button class="btn btn-ghost" onclick="closeShareDialog();shareCSV('wagon')" style="justify-content:flex-start;gap:14px">
+        <button class="btn btn-ghost" id="sd-csv-wagon" style="justify-content:flex-start;gap:14px">
           <span style="font-size:1.4rem">📋</span>
           <div style="text-align:left">
             <div style="font-size:.9rem;font-weight:700">Historique CSV (ce wagon)</div>
             <div style="font-size:.72rem;font-weight:400;opacity:.75;text-transform:none;letter-spacing:0">Tous les essieux de ce wagon</div>
           </div>
         </button>
-        <button class="btn btn-ghost" onclick="closeShareDialog();shareCSV('all')" style="justify-content:flex-start;gap:14px">
+        <button class="btn btn-ghost" id="sd-csv-all" style="justify-content:flex-start;gap:14px">
           <span style="font-size:1.4rem">🗂</span>
           <div style="text-align:left">
             <div style="font-size:.9rem;font-weight:700">Historique complet</div>
             <div style="font-size:.72rem;font-weight:400;opacity:.75;text-transform:none;letter-spacing:0">Tous les wagons enregistrés</div>
           </div>
         </button>
-        <button class="btn btn-ghost btn-sm" onclick="closeShareDialog()" style="margin-top:4px;color:var(--t3)">Annuler</button>
+        <button class="btn btn-ghost btn-sm" id="sd-cancel" style="margin-top:4px;color:var(--t3)">Annuler</button>
       </div>
     </div>`;
+
+  // Attacher les handlers APRÈS insertion pour garder le contexte de geste
   overlay.addEventListener('click', e => { if (e.target === overlay) closeShareDialog(); });
   document.body.appendChild(overlay);
+
+  // Bouton Formulaire Excel
+  document.getElementById('sd-xlsx').addEventListener('click', async () => {
+    closeShareDialog();
+    try {
+      // Attendre que la pré-génération soit finie (max 5s)
+      if (!_prebuiltXLSX) {
+        toast('Génération…', 'info');
+        for (let i = 0; i < 50 && !_prebuiltXLSX; i++) await new Promise(r => setTimeout(r, 100));
+      }
+      if (!_prebuiltXLSX) { toast('Erreur de génération', 'error'); return; }
+      const { blob, filename } = _prebuiltXLSX;
+      const file = new File([blob], filename, { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+      if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
+        await navigator.share({ files: [file] });
+        toast('Fichier partagé ✓', 'success');
+      } else {
+        // Fallback téléchargement
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a'); a.href = url; a.download = filename;
+        document.body.appendChild(a); a.click(); document.body.removeChild(a);
+        setTimeout(() => URL.revokeObjectURL(url), 2000);
+        toast('Fichier téléchargé — envoyez-le manuellement', 'info');
+      }
+    } catch(e) {
+      if (e.name !== 'AbortError') { console.error(e); await exportXLSX('wagon'); }
+    }
+  });
+
+  // Bouton CSV wagon
+  document.getElementById('sd-csv-wagon').addEventListener('click', () => {
+    closeShareDialog();
+    shareCSV('wagon');
+  });
+
+  // Bouton CSV tout
+  document.getElementById('sd-csv-all').addEventListener('click', () => {
+    closeShareDialog();
+    shareCSV('all');
+  });
+
+  document.getElementById('sd-cancel').addEventListener('click', closeShareDialog);
 }
 
 function closeShareDialog() {
