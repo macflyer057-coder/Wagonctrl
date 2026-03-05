@@ -391,6 +391,23 @@ async function copyWagonData() {
       </div>
     </div>
 
+    <!-- Entrée / Sortie -->
+    <div class="card" style="padding:14px 16px">
+      <p class="lbl" style="margin-bottom:10px">Type de contrôle</p>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px" id="toggle-type">
+        <button id="btn-entree" onclick="setControlType('entree')"
+          style="padding:14px 10px;border-radius:var(--r1);border:2px solid var(--amber);background:var(--amber);color:#000;font-family:var(--fd);font-weight:800;font-size:.85rem;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:5px">
+          <span style="font-size:1.4rem">🔽</span>
+          <span>Essieu à l'entrée</span>
+        </button>
+        <button id="btn-sortie" onclick="setControlType('sortie')"
+          style="padding:14px 10px;border-radius:var(--r1);border:2px solid var(--border);background:transparent;color:var(--t2);font-family:var(--fd);font-weight:800;font-size:.85rem;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:5px">
+          <span style="font-size:1.4rem">🔼</span>
+          <span>Essieu à la sortie</span>
+        </button>
+      </div>
+    </div>
+
     <div class="mt">
       <button class="btn btn-amber" onclick="goToScan()">
         <span>Commencer le scan</span><span>→</span>
@@ -416,6 +433,7 @@ async function copyWagonData() {
         <div>
           <div style="font-family:var(--fd);font-size:.6rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--t3);margin-bottom:3px">Wagon</div>
           <div class="wagon-num" id="hdr-wagon">—</div>
+          <div id="hdr-type" style="font-size:.65rem;font-weight:700;margin-top:3px;opacity:.8">🔽 Entrée</div>
         </div>
         <div style="text-align:right">
           <div style="font-family:var(--fd);font-size:.6rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--t3);margin-bottom:3px">Essieu</div>
@@ -624,6 +642,7 @@ const state = {
   wagon: '',
   nbEssieux: 4,
   essieuIndex: 1,
+  controlType: 'entree', // 'entree' ou 'sortie'
 };
 
 /* ── STORAGE ────────────────────────────────────────────── */
@@ -727,6 +746,20 @@ function renderPips(n) {
 /* Initial pips */
 renderPips(4);
 
+/* ── TOGGLE ENTRÉE / SORTIE ─────────────────────────────── */
+function setControlType(type) {
+  state.controlType = type;
+  const btnE = document.getElementById('btn-entree');
+  const btnS = document.getElementById('btn-sortie');
+  if (type === 'entree') {
+    btnE.style.cssText = 'padding:14px 10px;border-radius:var(--r1);border:2px solid var(--amber);background:var(--amber);color:#000;font-family:var(--fd);font-weight:800;font-size:.85rem;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:5px';
+    btnS.style.cssText = 'padding:14px 10px;border-radius:var(--r1);border:2px solid var(--border);background:transparent;color:var(--t2);font-family:var(--fd);font-weight:800;font-size:.85rem;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:5px';
+  } else {
+    btnS.style.cssText = 'padding:14px 10px;border-radius:var(--r1);border:2px solid var(--amber);background:var(--amber);color:#000;font-family:var(--fd);font-weight:800;font-size:.85rem;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:5px';
+    btnE.style.cssText = 'padding:14px 10px;border-radius:var(--r1);border:2px solid var(--border);background:transparent;color:var(--t2);font-family:var(--fd);font-weight:800;font-size:.85rem;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:5px';
+  }
+}
+
 /* ── NAVIGATION ─────────────────────────────────────────── */
 function showScreen(id) {
   document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
@@ -756,8 +789,9 @@ function goToScan() {
     nb = parseInt(selVal, 10);
   }
 
-  state.wagon      = wagonVal;
-  state.nbEssieux  = nb;
+  state.wagon       = wagonVal;
+  state.nbEssieux   = nb;
+  // controlType déjà dans state, mis à jour par setControlType()
   state.essieuIndex = 1;
 
   updateScanHeader();
@@ -797,6 +831,7 @@ function showFormZone(pairs, missing) {
 function updateScanHeader() {
   const i = state.essieuIndex, n = state.nbEssieux;
   document.getElementById('hdr-wagon').textContent  = state.wagon;
+  document.getElementById('hdr-type').textContent   = state.controlType === 'entree' ? '🔽 Entrée' : '🔼 Sortie';
   document.getElementById('hdr-idx').textContent    = i;
   document.getElementById('hdr-total').textContent  = n;
   document.getElementById('scan-ess-lbl').textContent = i;
@@ -1004,6 +1039,7 @@ function saveEssieu() {
   addRecord({
     wagon:        state.wagon,
     essieu_index: state.essieuIndex,
+    control_type: state.controlType,
     ...fields,
   });
 
@@ -1022,8 +1058,9 @@ function saveEssieu() {
 /* ── FIN ────────────────────────────────────────────────── */
 function goToFin() {
   const n = state.nbEssieux;
+  const typeLabel = state.controlType === 'sortie' ? '🔼 Essieux à la sortie' : '🔽 Essieux à l'entrée';
   document.getElementById('fin-subtitle').textContent =
-    `${n} essieu${n>1?'x':''} enregistré${n>1?'s':''} avec succès.`;
+    `${typeLabel} — ${n} essieu${n>1?'x':''} enregistré${n>1?'s':''}.`;
   document.getElementById('fin-wagon').textContent  = state.wagon;
   document.getElementById('fin-badge-ess').textContent = `${n} essieu${n>1?'x':''}`;
   document.getElementById('fin-badge-date').textContent = new Date().toLocaleDateString('fr-FR');
@@ -1042,7 +1079,10 @@ function renderHistItem(r) {
   <div class="hist-item">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px">
       <span style="font-family:var(--fd);font-size:.72rem;font-weight:800;color:var(--amber);letter-spacing:.06em">ESSIEU ${r.essieu_index}</span>
-      <span style="font-family:var(--fd);font-size:.68rem;color:var(--t3)">SN ${r.sn || '—'}</span>
+      <div style="display:flex;align-items:center;gap:6px">
+        <span style="font-size:.65rem;font-weight:700;padding:2px 7px;border-radius:999px;background:${r.control_type==='sortie'?'rgba(99,102,241,.15)':'rgba(240,165,0,.15)'};color:${r.control_type==='sortie'?'#818cf8':'var(--amber)'}">${r.control_type==='sortie'?'🔼 Sortie':'🔽 Entrée'}</span>
+        <span style="font-family:var(--fd);font-size:.68rem;color:var(--t3)">SN ${r.sn || '—'}</span>
+      </div>
     </div>
     <div class="dgrid">
       <div class="dcell"><div class="dcell-lbl">Type</div><div class="dcell-val">${r.type||'—'}</div></div>
@@ -1113,42 +1153,35 @@ function exportCSV(mode) {
   toast(`CSV téléchargé : ${filename}`, 'success');
 }
 
-// Partage natif Android — ouvre le sélecteur d'applications
-async function shareCSV(mode) {
+// Partage natif — ouvre le sélecteur d'applications ou l'app mail
+function shareCSV(mode) {
   const result = buildCSV(mode);
   if (!result) { toast('Aucune donnée à exporter', 'error'); return; }
-  const { blob, filename, rows } = result;
-
+  const { blob, filename } = result;
+  const subject = mode === 'wagon' ? `Contrôle wagon ${state.wagon}` : 'Export WagonCtrl';
   const file = new File([blob], filename, { type: 'text/csv' });
 
-  try {
-    if (navigator.share) {
-      // Essayer share avec fichier directement
-      try {
-        await navigator.share({ files: [file] });
-        toast('Fichier partagé ✓', 'success');
-        return;
-      } catch(shareErr) {
-        if (shareErr.name === 'AbortError') return;
-        // Fichier non supporté → télécharger + ouvrir sélecteur texte
-        exportCSV(mode);
-        try {
-          await navigator.share({
-            title: mode === 'wagon' ? `Contrôle wagon ${state.wagon}` : 'Export WagonCtrl',
-            text: `Données exportées — fichier téléchargé : ${filename}`,
-          });
-        } catch(e2) { if (e2.name === 'AbortError') return; }
-        toast('Fichier téléchargé — joignez-le au mail', 'info');
-        return;
-      }
-    }
-  } catch(e) {
-    if (e.name === 'AbortError') return;
+  if (!navigator.share) {
+    dlBlob(blob, filename);
+    const subj = encodeURIComponent(subject);
+    const body = encodeURIComponent('Bonjour,
+
+Veuillez joindre le fichier : ' + filename + '
+
+WagonCtrl');
+    setTimeout(() => { window.location.href = 'mailto:?subject=' + subj + '&body=' + body; }, 400);
+    toast('Fichier téléchargé — joignez-le au mail', 'info');
+    return;
   }
 
-  // Dernier fallback : téléchargement simple
-  exportCSV(mode);
-  toast('Fichier téléchargé — envoyez-le manuellement', 'info');
+  // Chrome Android HTTPS : share() appelé directement (contexte de geste conservé)
+  navigator.share({ files: [file] })
+    .then(() => toast('Fichier partagé ✓', 'success'))
+    .catch(e => {
+      if (e.name === 'AbortError') return;
+      dlBlob(blob, filename);
+      toast('Fichier téléchargé — envoyez-le depuis Téléchargements', 'info');
+    });
 }
 
 // Fallback : partage CSV en texte via navigator.share
@@ -1178,6 +1211,7 @@ function newControl() {
   document.getElementById('sel-essieux').value = '4';
   document.getElementById('custom-group').style.display = 'none';
   renderPips(4);
+  setControlType('entree');
   showScreen('s-wagon');
 }
 
@@ -1207,13 +1241,22 @@ const XLSX_TEMPLATE_B64 = 'UEsDBBQABgAIAAAAIQBWfxO0rgEAAP8GAAATAAgCW0NvbnRlbnRfV
 // Mapping essieu index → colonne Excel (H=8, J=10, L=12, N=14)
 const ESSIEU_COLS = { 1: 'H', 2: 'J', 3: 'L', 4: 'N' };
 
-// Lignes des champs dans le formulaire
+// Lignes des champs selon le type de contrôle
 const FIELD_ROWS = {
-  sn:           14,  // Numéro d'essieu
-  type:         15,  // Type de construction / Tonnage
-  detenteur:    16,  // Détenteur
-  date_revision:17,  // Date IS2
-  atelier:      18,  // Atelier IS2
+  entree: {
+    sn:            14,  // Numéro d'essieu
+    type:          15,  // Type de construction / Tonnage
+    detenteur:     16,  // Détenteur
+    date_revision: 17,  // Date IS2
+    atelier:       18,  // Atelier IS2
+  },
+  sortie: {
+    sn:            33,  // Numéro d'essieu (section sortie)
+    type:          34,  // Type de construction / Tonnage
+    detenteur:     35,  // Détenteur
+    date_revision: 40,  // Date IS2
+    atelier:       41,  // Atelier IS2
+  },
 };
 
 // ── Manipulation directe du ZIP sans dépendance externe ──
@@ -1469,18 +1512,19 @@ async function buildXLSXBlob(mode) {
   // Détenteur en D9
   if (rows[0]?.detenteur) xml = injectCell(xml, 'D9', rows[0].detenteur);
 
-  // Données essieux
+  // Données essieux — selon entrée ou sortie
+  const fRows = FIELD_ROWS[rows[0]?.control_type || 'entree'];
   rows.forEach(r => {
     const col = ESSIEU_COLS[r.essieu_index];
     if (!col) return;
     const set = (row, val) => {
       if (val != null && val !== '') xml = injectCell(xml, `${col}${row}`, val);
     };
-    set(FIELD_ROWS.sn,            r.sn);
-    set(FIELD_ROWS.type,          r.type);
-    set(FIELD_ROWS.detenteur,     r.detenteur);
-    set(FIELD_ROWS.date_revision, r.date_revision);
-    set(FIELD_ROWS.atelier,       r.atelier);
+    set(fRows.sn,            r.sn);
+    set(fRows.type,          r.type);
+    set(fRows.detenteur,     r.detenteur);
+    set(fRows.date_revision, r.date_revision);
+    set(fRows.atelier,       r.atelier);
   });
 
   // Mettre à jour sheet1.xml et sharedStrings.xml dans le ZIP natif
@@ -1557,10 +1601,10 @@ async function shareXLSX(mode) {
 // Au clic, navigator.share() est appelé SYNCHRONIQUEMENT dans le geste → Android ouvre le sélecteur.
 let _prebuiltXLSX = null; // { blob, filename } pré-générés
 
-async function showShareDialog() {
-  // Lancer la génération XLSX en arrière-plan immédiatement
+function showShareDialog() {
+  // Pré-générer le XLSX dès l'ouverture du dialogue
   _prebuiltXLSX = null;
-  buildXLSXBlob('wagon').then(r => { _prebuiltXLSX = r; }).catch(() => {});
+  const xlsxPromise = buildXLSXBlob('wagon').then(r => { _prebuiltXLSX = r; return r; });
 
   const overlay = document.createElement('div');
   overlay.id = 'share-dialog';
@@ -1595,71 +1639,107 @@ async function showShareDialog() {
       </div>
     </div>`;
 
-  // Attacher les handlers APRÈS insertion pour garder le contexte de geste
   overlay.addEventListener('click', e => { if (e.target === overlay) closeShareDialog(); });
   document.body.appendChild(overlay);
 
-  // Bouton Formulaire Excel
-  document.getElementById('sd-xlsx').addEventListener('click', async () => {
+  // ── Formulaire Excel ──
+  // Clé : navigator.share() est appelé IMMÉDIATEMENT dans le click handler
+  // en passant xlsxPromise — Chrome Android accepte une Promise<File[]>
+  document.getElementById('sd-xlsx').addEventListener('click', () => {
     closeShareDialog();
-    try {
-      // Attendre que la pré-génération soit finie (max 5s)
-      if (!_prebuiltXLSX) {
-        toast('Génération…', 'info');
-        for (let i = 0; i < 50 && !_prebuiltXLSX; i++) await new Promise(r => setTimeout(r, 100));
-      }
-      if (!_prebuiltXLSX) { toast('Erreur de génération', 'error'); return; }
-      const { blob, filename } = _prebuiltXLSX;
-      const file = new File([blob], filename, { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-      // Essayer share avec fichier directement (sans vérifier canShare)
-      if (navigator.share) {
-        try {
-          await navigator.share({ files: [file] });
-          toast('Fichier partagé ✓', 'success');
-          return;
-        } catch(shareErr) {
-          if (shareErr.name === 'AbortError') return; // annulé par l'utilisateur
-          // share avec fichier non supporté → essayer sans fichier
-          try {
-            // Télécharger le fichier en même temps
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a'); a.href = url; a.download = filename;
-            document.body.appendChild(a); a.click(); document.body.removeChild(a);
-            setTimeout(() => URL.revokeObjectURL(url), 2000);
-            // Ouvrir le sélecteur d'apps avec texte
-            await navigator.share({
-              title: `Formulaire wagon ${state.wagon}`,
-              text: `Signalement essieux wagon ${state.wagon} — fichier téléchargé : ${filename}`,
-            });
-            toast('Fichier téléchargé — joignez-le au mail', 'info');
-            return;
-          } catch(e2) { if (e2.name === 'AbortError') return; }
-        }
-      }
-      // Dernier fallback : simple téléchargement
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a'); a.href = url; a.download = filename;
-      document.body.appendChild(a); a.click(); document.body.removeChild(a);
-      setTimeout(() => URL.revokeObjectURL(url), 2000);
-      toast('Fichier téléchargé dans Téléchargements', 'info');
-    } catch(e) {
-      if (e.name !== 'AbortError') { console.error(e); await exportXLSX('wagon'); }
+    if (!navigator.share) {
+      // Pas de Web Share API : télécharger + ouvrir mailto
+      xlsxPromise.then(r => {
+        if (!r) return;
+        dlBlob(r.blob, r.filename);
+        const subj = encodeURIComponent('Formulaire wagon ' + state.wagon);
+        const body = encodeURIComponent('Bonjour,
+
+Veuillez joindre le fichier : ' + r.filename + '
+
+WagonCtrl');
+        setTimeout(() => { window.location.href = 'mailto:?subject=' + subj + '&body=' + body; }, 400);
+        toast('Fichier téléchargé — joignez-le au mail', 'info');
+      });
+      return;
     }
+    // Chrome Android HTTPS : share() appelé directement avec la Promise
+    const filesPromise = xlsxPromise.then(r => {
+      if (!r) throw new Error('no data');
+      return [new File([r.blob], r.filename, {
+        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+      })];
+    });
+    navigator.share({ files: filesPromise })
+      .then(() => toast('Fichier partagé ✓', 'success'))
+      .catch(e => {
+        if (e.name === 'AbortError') return;
+        // share({files: Promise}) pas supporté → fallback classique
+        xlsxPromise.then(r => {
+          if (!r) return;
+          dlBlob(r.blob, r.filename);
+          toast('Fichier téléchargé — envoyez-le depuis Téléchargements', 'info');
+        });
+      });
   });
 
-  // Bouton CSV wagon
+  // ── CSV ce wagon ──
   document.getElementById('sd-csv-wagon').addEventListener('click', () => {
     closeShareDialog();
     shareCSV('wagon');
   });
 
-  // Bouton CSV tout
+  // ── CSV tout ──
   document.getElementById('sd-csv-all').addEventListener('click', () => {
     closeShareDialog();
     shareCSV('all');
   });
 
   document.getElementById('sd-cancel').addEventListener('click', closeShareDialog);
+}
+
+// Helper : déclenche un téléchargement
+function dlBlob(blob, filename) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click();
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 2000);
+}
+
+
+// ── Fonction universelle de partage de fichier ──
+// Fonctionne en HTTPS (Web Share API) et en HTTP/file:// (mailto: base64)
+async function shareFileOrFallback(blob, filename, mimeType, subject) {
+  const file = new File([blob], filename, { type: mimeType });
+
+  // Méthode 1 : Web Share API avec fichier (HTTPS uniquement)
+  if (window.isSecureContext && navigator.share) {
+    try {
+      await navigator.share({ files: [file] });
+      toast('Fichier partagé ✓', 'success');
+      return;
+    } catch(e) {
+      if (e.name === 'AbortError') return; // Utilisateur a annulé
+      // Sinon on continue vers la méthode suivante
+    }
+  }
+
+  // Méthode 2 : Télécharger le fichier + ouvrir l'app mail via intent Android
+  // Le fichier sera dans Téléchargements, l'utilisateur n'a qu'à le joindre
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click();
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 3000);
+
+  // Ouvrir directement l'application mail via mailto:
+  const mailtoLink = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent('Bonjour,\n\nVeuillez trouver en pièce jointe le fichier : ' + filename + '\n\nEnvoyé depuis WagonCtrl')}`;
+  window.location.href = mailtoLink;
+
+  toast('Fichier téléchargé — joignez-le au mail', 'info');
 }
 
 function closeShareDialog() {
