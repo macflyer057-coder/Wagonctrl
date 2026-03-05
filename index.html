@@ -1120,32 +1120,7 @@ function exportCSV(mode) {
   toast(`CSV téléchargé : ${filename}`, 'success');
 }
 
-// Partage natif — ouvre le sélecteur d'applications ou l'app mail
-function shareCSV(mode) {
-  const result = buildCSV(mode);
-  if (!result) { toast('Aucune donnée à exporter', 'error'); return; }
-  const { blob, filename } = result;
-  const subject = mode === 'wagon' ? `Contrôle wagon ${state.wagon}` : 'Export WagonCtrl';
-  const file = new File([blob], filename, { type: 'text/csv' });
-
-  if (!navigator.share) {
-    dlBlob(blob, filename);
-    const subj = encodeURIComponent(subject);
-    const body = encodeURIComponent('Bonjour,\n\nVeuillez joindre le fichier : ' + filename + '\n\nWagonCtrl');
-    setTimeout(() => { window.location.href = 'mailto:?subject=' + subj + '&body=' + body; }, 400);
-    toast('Fichier téléchargé — joignez-le au mail', 'info');
-    return;
-  }
-
-  // Chrome Android HTTPS : share() appelé directement (contexte de geste conservé)
-  navigator.share({ files: [file] })
-    .then(() => toast('Fichier partagé ✓', 'success'))
-    .catch(e => {
-      if (e.name === 'AbortError') return;
-      dlBlob(blob, filename);
-      toast('Fichier téléchargé — envoyez-le depuis Téléchargements', 'info');
-    });
-}
+// shareCSV est maintenant géré via showShareDialog → showReadyToShare
 
 // Fallback : partage CSV en texte via navigator.share
 function shareAsText(mode, rows) {
@@ -1606,55 +1581,91 @@ function showShareDialog() {
   document.body.appendChild(overlay);
 
   // ── Formulaire Excel ──
-  // Clé : navigator.share() est appelé IMMÉDIATEMENT dans le click handler
-  // en passant xlsxPromise — Chrome Android accepte une Promise<File[]>
   document.getElementById('sd-xlsx').addEventListener('click', () => {
     closeShareDialog();
-    if (!navigator.share) {
-      // Pas de Web Share API : télécharger + ouvrir mailto
-      xlsxPromise.then(r => {
-        if (!r) return;
-        dlBlob(r.blob, r.filename);
-        const subj = encodeURIComponent('Formulaire wagon ' + state.wagon);
-        const body = encodeURIComponent('Bonjour,\n\nVeuillez joindre le fichier : ' + r.filename + '\n\nWagonCtrl');
-        setTimeout(() => { window.location.href = 'mailto:?subject=' + subj + '&body=' + body; }, 400);
-        toast('Fichier téléchargé — joignez-le au mail', 'info');
-      });
-      return;
-    }
-    // Chrome Android HTTPS : share() appelé directement avec la Promise
-    const filesPromise = xlsxPromise.then(r => {
-      if (!r) throw new Error('no data');
-      return [new File([r.blob], r.filename, {
-        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-      })];
+    xlsxPromise.then(r => {
+      if (!r) { toast('Erreur de génération', 'error'); return; }
+      showReadyToShare(r.blob, r.filename,
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
     });
-    navigator.share({ files: filesPromise })
-      .then(() => toast('Fichier partagé ✓', 'success'))
-      .catch(e => {
-        if (e.name === 'AbortError') return;
-        // share({files: Promise}) pas supporté → fallback classique
-        xlsxPromise.then(r => {
-          if (!r) return;
-          dlBlob(r.blob, r.filename);
-          toast('Fichier téléchargé — envoyez-le depuis Téléchargements', 'info');
-        });
-      });
   });
 
   // ── CSV ce wagon ──
   document.getElementById('sd-csv-wagon').addEventListener('click', () => {
     closeShareDialog();
-    shareCSV('wagon');
+    const r = buildCSV('wagon');
+    if (!r) { toast('Aucune donnée', 'error'); return; }
+    showReadyToShare(r.blob, r.filename, 'text/csv');
   });
 
   // ── CSV tout ──
   document.getElementById('sd-csv-all').addEventListener('click', () => {
     closeShareDialog();
-    shareCSV('all');
+    const r = buildCSV('all');
+    if (!r) { toast('Aucune donnée', 'error'); return; }
+    showReadyToShare(r.blob, r.filename, 'text/csv');
   });
 
   document.getElementById('sd-cancel').addEventListener('click', closeShareDialog);
+}
+
+// ── Panneau "Fichier prêt" avec bouton Partager ──
+// Chrome Android exige que navigator.share() soit dans un clic direct.
+// On affiche donc un bouton intermédiaire une fois le fichier généré.
+function showReadyToShare(blob, filename, mimeType) {
+  const file = new File([blob], filename, { type: mimeType });
+
+  const panel = document.createElement('div');
+  panel.id = 'share-ready';
+  panel.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9999;display:flex;align-items:flex-end;justify-content:center';
+  panel.innerHTML = `
+    <div style="background:var(--bg-2);border-radius:20px 20px 0 0;width:100%;max-width:480px;padding:20px 20px 36px">
+      <div style="width:40px;height:4px;background:var(--border);border-radius:2px;margin:0 auto 18px"></div>
+      <div style="text-align:center;margin-bottom:20px">
+        <div style="font-size:2.5rem;margin-bottom:8px">✅</div>
+        <div style="font-family:var(--fd);font-size:1rem;font-weight:800;color:var(--t1);margin-bottom:4px">Fichier prêt</div>
+        <div style="font-size:.75rem;color:var(--t3);word-break:break-all">${filename}</div>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <button id="srp-share" class="btn btn-amber" style="font-size:1rem;padding:16px">
+          <span>↗</span><span>Ouvrir le menu de partage</span>
+        </button>
+        <button id="srp-dl" class="btn btn-ghost">
+          <span>⬇</span><span>Télécharger uniquement</span>
+        </button>
+        <button id="srp-cancel" class="btn btn-ghost btn-sm" style="color:var(--t3)">Annuler</button>
+      </div>
+    </div>`;
+
+  document.body.appendChild(panel);
+
+  // Bouton Partager — geste utilisateur direct → navigator.share() fonctionne
+  document.getElementById('srp-share').addEventListener('click', () => {
+    panel.remove();
+    if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
+      navigator.share({ files: [file] })
+        .then(() => toast('Fichier partagé ✓', 'success'))
+        .catch(e => { if (e.name !== 'AbortError') { dlBlob(blob, filename); toast('Fichier téléchargé', 'info'); } });
+    } else if (navigator.share) {
+      navigator.share({ title: filename, text: 'Fichier WagonCtrl : ' + filename })
+        .catch(() => {});
+      dlBlob(blob, filename);
+      toast('Fichier téléchargé — joignez-le au mail', 'info');
+    } else {
+      dlBlob(blob, filename);
+      toast('Fichier téléchargé', 'info');
+    }
+  });
+
+  // Bouton Télécharger
+  document.getElementById('srp-dl').addEventListener('click', () => {
+    panel.remove();
+    dlBlob(blob, filename);
+    toast('Fichier téléchargé ✓', 'success');
+  });
+
+  document.getElementById('srp-cancel').addEventListener('click', () => panel.remove());
+  panel.addEventListener('click', e => { if (e.target === panel) panel.remove(); });
 }
 
 // Helper : déclenche un téléchargement
