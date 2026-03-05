@@ -1639,18 +1639,20 @@ function showReadyToShare(blob, filename, mimeType) {
 
   document.body.appendChild(panel);
 
-  // Bouton Partager — geste utilisateur direct → navigator.share() fonctionne
+  // Bouton Partager — geste utilisateur direct → navigator.share() fonctionne sur Chrome Android HTTPS
   document.getElementById('srp-share').addEventListener('click', () => {
     panel.remove();
-    if (navigator.share && navigator.canShare && navigator.canShare({ files: [file] })) {
+    if (navigator.share) {
       navigator.share({ files: [file] })
         .then(() => toast('Fichier partagé ✓', 'success'))
-        .catch(e => { if (e.name !== 'AbortError') { dlBlob(blob, filename); toast('Fichier téléchargé', 'info'); } });
-    } else if (navigator.share) {
-      navigator.share({ title: filename, text: 'Fichier WagonCtrl : ' + filename })
-        .catch(() => {});
-      dlBlob(blob, filename);
-      toast('Fichier téléchargé — joignez-le au mail', 'info');
+        .catch(e => {
+          if (e.name === 'AbortError') return; // utilisateur a annulé
+          // share avec fichier échoue → télécharger + ouvrir sélecteur sans fichier
+          dlBlob(blob, filename);
+          navigator.share({ title: filename.replace(/\.xlsx$/, '').replace(/_/g,' '), text: 'Fichier téléchargé : ' + filename })
+            .catch(() => {});
+          toast('Fichier téléchargé — joignez-le au mail', 'info');
+        });
     } else {
       dlBlob(blob, filename);
       toast('Fichier téléchargé', 'info');
