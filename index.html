@@ -1620,7 +1620,10 @@ function showShareDialog() {
 // Chrome Android exige que navigator.share() soit dans un clic direct.
 // On affiche donc un bouton intermédiaire une fois le fichier généré.
 function showReadyToShare(blob, filename, mimeType) {
-  const file = new File([blob], filename, { type: mimeType });
+  // Chrome Android bloque certains types MIME dans navigator.share
+  // On utilise application/octet-stream qui est toujours accepté
+  const shareMime = 'application/octet-stream';
+  const file = new File([blob], filename, { type: shareMime });
 
   const panel = document.createElement('div');
   panel.id = 'share-ready';
