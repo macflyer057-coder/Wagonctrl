@@ -381,6 +381,13 @@ body {
       </button>
     </div>
 
+    <!-- Diagnostic partage -->
+    <div style="margin-top:12px">
+      <button class="btn btn-ghost btn-sm" onclick="diagShare()" style="width:100%;color:var(--t3);font-size:.7rem">
+        🔬 Tester le partage (diagnostic)
+      </button>
+    </div>
+
   </div>
 </div>
 
@@ -1791,6 +1798,38 @@ async function copyWagonData() {
     document.body.appendChild(ta); ta.select();
     document.execCommand('copy'); document.body.removeChild(ta);
     toast('Données copiées ✓', 'success');
+  }
+}
+
+// ── Diagnostic partage ──
+async function diagShare() {
+  const lines = [];
+  lines.push('navigator.share : ' + (!!navigator.share));
+  lines.push('navigator.canShare : ' + (!!navigator.canShare));
+  lines.push('isSecureContext : ' + window.isSecureContext);
+  lines.push('protocol : ' + location.protocol);
+
+  if (navigator.canShare) {
+    const testBlob = new Blob(['test'], { type: 'text/plain' });
+    const testFile = new File([testBlob], 'test.txt', { type: 'text/plain' });
+    const testXlsx = new File([testBlob], 'test.xlsx', { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    lines.push('canShare txt : ' + navigator.canShare({ files: [testFile] }));
+    lines.push('canShare xlsx : ' + navigator.canShare({ files: [testXlsx] }));
+  }
+
+  const msg = lines.join('\n');
+  alert(msg);
+
+  // Si share disponible, tester directement
+  if (navigator.share) {
+    const blob = new Blob(['Test WagonCtrl'], { type: 'text/plain' });
+    const file = new File([blob], 'test_wagonctrl.txt', { type: 'text/plain' });
+    try {
+      await navigator.share({ files: [file] });
+      toast('Partage test réussi ✓', 'success');
+    } catch(e) {
+      toast('Erreur partage : ' + e.name + ' — ' + e.message, 'error');
+    }
   }
 }
 </script>
