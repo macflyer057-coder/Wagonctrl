@@ -722,17 +722,27 @@ function parseQR(raw) {
     pairs[seg.slice(0, eq).trim().toUpperCase()] = seg.slice(eq + 1).trim();
   });
 
-  // Entrée : accepte IS2 (REV/ATELIER) OU IS3 (DATE_IS3/ATELIER_IS3)
-  // Normaliser vers REV/ATELIER pour le formulaire, stocker le type
-  if (!pairs['REV'] && pairs['DATE_IS3']) {
-    pairs['REV']     = pairs['DATE_IS3'];
-    pairs['ATELIER'] = pairs['ATELIER_IS3'] || '';
-    pairs['_REV_TYPE'] = 'IS3';
-  } else if (pairs['REV']) {
+  // Normaliser REV/ATELIER selon ce qui est présent dans le QR
+  // Priorité : REV > DATE_IS2 > DATE_IS3
+  if (!pairs['REV']) {
+    if (pairs['DATE_IS2']) {
+      pairs['REV']       = pairs['DATE_IS2'];
+      pairs['ATELIER']   = pairs['ATELIER_IS2'] || pairs['ATELIER'] || '';
+      pairs['_REV_TYPE'] = 'IS2';
+    } else if (pairs['DATE_IS3']) {
+      pairs['REV']       = pairs['DATE_IS3'];
+      pairs['ATELIER']   = pairs['ATELIER_IS3'] || pairs['ATELIER'] || '';
+      pairs['_REV_TYPE'] = 'IS3';
+    }
+  } else {
     pairs['_REV_TYPE'] = 'IS2';
   }
 
-  const REQUIRED = ['SN','TYPE','TONNAGE','OWNER','REV','ATELIER'];
+  // En mode sortie, REV/ATELIER ne sont pas obligatoires (les champs IS* suffisent)
+  const isSortieMode = !!(pairs['DATE_IS3'] || pairs['DATE_IS2'] || pairs['DATE_IS1'] || pairs['DATE_IL']);
+  const REQUIRED = isSortieMode
+    ? ['SN','TYPE','TONNAGE','OWNER']
+    : ['SN','TYPE','TONNAGE','OWNER','REV','ATELIER'];
   const missing = REQUIRED.filter(k => !pairs[k]);
   return { pairs, missing };
 }
@@ -1132,9 +1142,13 @@ function saveEssieu() {
     atelier:      document.getElementById('f-atelier').value.trim(),
   };
 
-  const empty = Object.entries(fields)
-    .filter(([,v]) => !v)
-    .map(([k]) => ({sn:'N° série',type:'Type',tonnage:'Tonnage',detenteur:'Détenteur',date_revision:'Date révision',atelier:'Atelier IS2/IS3'}[k]));
+  // En sortie, date_revision/atelier sont optionnels (les champs IS*/IL suffisent)
+  const requiredKeys = state.controlType === 'sortie'
+    ? ['sn','type','tonnage','detenteur']
+    : ['sn','type','tonnage','detenteur','date_revision','atelier'];
+
+  const labels = {sn:'N° série',type:'Type',tonnage:'Tonnage',detenteur:'Détenteur',date_revision:'Date IS2/IS3',atelier:'Atelier IS2/IS3'};
+  const empty = requiredKeys.filter(k => !fields[k]).map(k => labels[k]);
 
   if (empty.length) {
     toast('Champs vides : ' + empty.join(', '), 'error'); return;
