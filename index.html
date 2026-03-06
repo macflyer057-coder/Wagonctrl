@@ -820,11 +820,10 @@ function updateSaveButton() {
 // Flag : l'utilisateur vient d'ouvrir le scanner → on attend son retour
 let scannerJustOpened = false;
 
-// Ouvre le Scanner via intent Android
+// Ouvre le Scanneur Xiaomi MIUI (package: com.miui.scanner)
 function openScanner() {
   scannerJustOpened = true;
 
-  // Méthode fiable : créer un lien temporaire et le cliquer programmatiquement
   function tryUri(uri) {
     try {
       const a = document.createElement('a');
@@ -836,29 +835,37 @@ function openScanner() {
     } catch(e) {}
   }
 
-  // Tenter Xiaomi Scanner en priorité
-  tryUri('intent://scan/#Intent;scheme=zxing;package=com.xiaomi.scanner;S.browser_fallback_url=;end');
+  // Format correct pour lancer "Scanneur" MIUI directement
+  // L'activity principale du scanner MIUI est com.miui.scanner.ScanActivity
+  tryUri('intent:#Intent;action=android.intent.action.MAIN;category=android.intent.category.LAUNCHER;component=com.miui.scanner/.ScanActivity;end');
 
-  // Après 1.8s si pas parti, tenter zxing générique (Barcode Scanner, etc.)
+  // Fallback 1 (1.2s) : intent générique vers le package sans activity spécifiée
   setTimeout(() => {
     if (document.visibilityState === 'visible' && scannerJustOpened) {
-      tryUri('zxing://scan/?ret=' + encodeURIComponent(window.location.href));
+      tryUri('intent:#Intent;action=android.intent.action.MAIN;package=com.miui.scanner;end');
     }
-  }, 1800);
+  }, 1200);
 
-  // Après 3.5s si toujours là, tenter intent générique ACTION_SCAN
+  // Fallback 2 (2.4s) : scheme miui://scanner
   setTimeout(() => {
     if (document.visibilityState === 'visible' && scannerJustOpened) {
-      tryUri('intent://com.google.zxing.client.android.SCAN#Intent;scheme=zxing;package=com.google.zxing.client.android;end');
+      tryUri('miui://scanner/');
     }
-  }, 3500);
+  }, 2400);
 
-  // Après 5s, afficher message d'aide
+  // Fallback 3 (3.6s) : zxing universel
+  setTimeout(() => {
+    if (document.visibilityState === 'visible' && scannerJustOpened) {
+      tryUri('zxing://scan/');
+    }
+  }, 3600);
+
+  // Après 5s : message aide manuelle
   setTimeout(() => {
     if (document.visibilityState === 'visible' && scannerJustOpened) {
       scannerJustOpened = false;
       document.getElementById('paste-hint').style.display = 'block';
-      toast('Aucun scanner détecté — scannez puis collez le résultat', 'warn');
+      toast('Scanner non ouvert — scannez manuellement puis collez', 'warn');
     }
   }, 5000);
 }
@@ -1610,29 +1617,32 @@ function showShareDialog() {
   document.getElementById('sd-cancel').addEventListener('click', closeShareDialog);
 }
 
-// ── Panneau "Fichier prêt" avec bouton Partager ──
-// Chrome Android exige que navigator.share() soit dans un clic direct.
-// On affiche donc un bouton intermédiaire une fois le fichier généré.
+// ── Panneau "Fichier prêt" ──
+// Stratégie : télécharger le fichier + ouvrir l'app mail via mailto:
+// C'est la méthode la plus fiable sur Android tous navigateurs confondus.
 function showReadyToShare(blob, filename, mimeType) {
-  // Chrome Android bloque certains types MIME dans navigator.share
-  // On utilise application/octet-stream qui est toujours accepté
-  const shareMime = 'application/octet-stream';
-  const file = new File([blob], filename, { type: shareMime });
-
   const panel = document.createElement('div');
   panel.id = 'share-ready';
   panel.style.cssText = 'position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:9999;display:flex;align-items:flex-end;justify-content:center';
+
+  const subj = encodeURIComponent('WagonCtrl — ' + filename.replace(/\.xlsx$|\.csv$/, '').replace(/_/g, ' '));
+  const body = encodeURIComponent('Bonjour,\n\nVeuillez trouver le fichier en pièce jointe : ' + filename + '\n\nEnvoyé depuis WagonCtrl');
+
   panel.innerHTML = `
     <div style="background:var(--bg-2);border-radius:20px 20px 0 0;width:100%;max-width:480px;padding:20px 20px 36px">
       <div style="width:40px;height:4px;background:var(--border);border-radius:2px;margin:0 auto 18px"></div>
-      <div style="text-align:center;margin-bottom:20px">
+      <div style="text-align:center;margin-bottom:16px">
         <div style="font-size:2.5rem;margin-bottom:8px">✅</div>
         <div style="font-family:var(--fd);font-size:1rem;font-weight:800;color:var(--t1);margin-bottom:4px">Fichier prêt</div>
         <div style="font-size:.75rem;color:var(--t3);word-break:break-all">${filename}</div>
       </div>
+      <div style="background:var(--bg-3);border-radius:var(--r1);padding:12px 14px;margin-bottom:14px;font-size:.78rem;color:var(--t2);line-height:1.5">
+        📎 Le fichier va se télécharger, puis votre app mail s'ouvrira.<br>
+        Joignez le fichier depuis le dossier <strong>Téléchargements</strong>.
+      </div>
       <div style="display:flex;flex-direction:column;gap:10px">
-        <button id="srp-share" class="btn btn-amber" style="font-size:1rem;padding:16px">
-          <span>↗</span><span>Ouvrir le menu de partage</span>
+        <button id="srp-mail" class="btn btn-amber" style="font-size:1rem;padding:16px">
+          <span>✉</span><span>Télécharger + Ouvrir le mail</span>
         </button>
         <button id="srp-dl" class="btn btn-ghost">
           <span>⬇</span><span>Télécharger uniquement</span>
@@ -1643,43 +1653,17 @@ function showReadyToShare(blob, filename, mimeType) {
 
   document.body.appendChild(panel);
 
-  // Bouton Partager — geste utilisateur direct → navigator.share() fonctionne sur Chrome Android HTTPS
-  document.getElementById('srp-share').addEventListener('click', () => {
+  // Bouton principal : télécharger + ouvrir mailto
+  document.getElementById('srp-mail').addEventListener('click', () => {
     panel.remove();
-    if (!navigator.share) {
-      dlBlob(blob, filename);
-      toast('Partage non supporté — fichier téléchargé', 'info');
-      return;
-    }
-
-    // Tester d'abord si le partage de fichier est supporté
-    const canShareFile = navigator.canShare && navigator.canShare({ files: [file] });
-
-    if (canShareFile) {
-      // Partage direct avec fichier joint
-      navigator.share({ files: [file] })
-        .then(() => toast('Fichier partagé ✓', 'success'))
-        .catch(e => {
-          if (e.name === 'AbortError') return;
-          // Erreur inattendue - afficher le message pour debug
-          toast('Erreur : ' + e.name + ' — ' + e.message, 'error');
-          dlBlob(blob, filename);
-        });
-    } else {
-      // Le partage de fichier n'est pas supporté sur cet appareil/navigateur
-      // Solution : télécharger + ouvrir Gmail/Outlook directement via intent
-      dlBlob(blob, filename);
-      // Attendre que le téléchargement démarre, puis ouvrir le sélecteur mail
-      setTimeout(() => {
-        const subj = encodeURIComponent('WagonCtrl — ' + filename.replace(/\.xlsx$|\.csv$/, '').replace(/_/g, ' '));
-        const body = encodeURIComponent('Bonjour,\n\nVeuillez trouver le fichier en pièce jointe.\n\nWagonCtrl');
-        window.location.href = 'mailto:?subject=' + subj + '&body=' + body;
-      }, 800);
-      toast('Fichier téléchargé — ajoutez-le en pièce jointe', 'info');
-    }
+    dlBlob(blob, filename);
+    setTimeout(() => {
+      window.location.href = 'mailto:?subject=' + subj + '&body=' + body;
+    }, 600);
+    toast('Fichier téléchargé — joignez-le au mail ✓', 'success');
   });
 
-  // Bouton Télécharger
+  // Bouton Télécharger uniquement
   document.getElementById('srp-dl').addEventListener('click', () => {
     panel.remove();
     dlBlob(blob, filename);
