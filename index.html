@@ -506,12 +506,77 @@ body {
         </div>
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
           <div class="field-group" style="margin-bottom:0">
-            <label class="lbl" style="font-size:.6rem;margin-bottom:5px">Date révision</label>
+            <label id="lbl-rev" class="lbl" style="font-size:.6rem;margin-bottom:5px">Date IS2</label>
             <input class="inp" id="f-rev" type="text" placeholder="REV" autocomplete="off"/>
           </div>
           <div class="field-group" style="margin-bottom:0">
-            <label class="lbl" style="font-size:.6rem;margin-bottom:5px">Atelier</label>
+            <label id="lbl-atelier" class="lbl" style="font-size:.6rem;margin-bottom:5px">Atelier IS2</label>
             <input class="inp" id="f-atelier" type="text" placeholder="ATELIER" autocomplete="off"/>
+          </div>
+        </div>
+      </div>
+
+      <!-- Champs supplémentaires SORTIE uniquement -->
+      <div id="f-sortie-block" style="display:none">
+        <div style="font-family:var(--fd);font-size:.6rem;font-weight:700;letter-spacing:.1em;text-transform:uppercase;color:var(--t3);margin:14px 0 8px">Révisions *(optionnel)*</div>
+
+        <!-- IS3 -->
+        <div class="card" style="padding:12px 14px;margin-bottom:8px">
+          <div style="font-size:.7rem;font-weight:700;color:var(--t2);margin-bottom:8px">IS3</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+            <div class="field-group" style="margin-bottom:0">
+              <label class="lbl" style="font-size:.6rem;margin-bottom:5px">Date IS3</label>
+              <input class="inp" id="f-date-is3" type="text" placeholder="optionnel" autocomplete="off"/>
+            </div>
+            <div class="field-group" style="margin-bottom:0">
+              <label class="lbl" style="font-size:.6rem;margin-bottom:5px">Atelier IS3</label>
+              <input class="inp" id="f-atelier-is3" type="text" placeholder="optionnel" autocomplete="off"/>
+            </div>
+          </div>
+        </div>
+
+        <!-- IS2 sortie -->
+        <div class="card" style="padding:12px 14px;margin-bottom:8px">
+          <div style="font-size:.7rem;font-weight:700;color:var(--t2);margin-bottom:8px">IS2</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+            <div class="field-group" style="margin-bottom:0">
+              <label class="lbl" style="font-size:.6rem;margin-bottom:5px">Date IS2</label>
+              <input class="inp" id="f-date-is2" type="text" placeholder="optionnel" autocomplete="off"/>
+            </div>
+            <div class="field-group" style="margin-bottom:0">
+              <label class="lbl" style="font-size:.6rem;margin-bottom:5px">Atelier IS2</label>
+              <input class="inp" id="f-atelier-is2" type="text" placeholder="optionnel" autocomplete="off"/>
+            </div>
+          </div>
+        </div>
+
+        <!-- IS1 -->
+        <div class="card" style="padding:12px 14px;margin-bottom:8px">
+          <div style="font-size:.7rem;font-weight:700;color:var(--t2);margin-bottom:8px">IS1</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+            <div class="field-group" style="margin-bottom:0">
+              <label class="lbl" style="font-size:.6rem;margin-bottom:5px">Date IS1</label>
+              <input class="inp" id="f-date-is1" type="text" placeholder="optionnel" autocomplete="off"/>
+            </div>
+            <div class="field-group" style="margin-bottom:0">
+              <label class="lbl" style="font-size:.6rem;margin-bottom:5px">Atelier IS1</label>
+              <input class="inp" id="f-atelier-is1" type="text" placeholder="optionnel" autocomplete="off"/>
+            </div>
+          </div>
+        </div>
+
+        <!-- IL -->
+        <div class="card" style="padding:12px 14px">
+          <div style="font-size:.7rem;font-weight:700;color:var(--t2);margin-bottom:8px">IL</div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+            <div class="field-group" style="margin-bottom:0">
+              <label class="lbl" style="font-size:.6rem;margin-bottom:5px">Date IL</label>
+              <input class="inp" id="f-date-il" type="text" placeholder="optionnel" autocomplete="off"/>
+            </div>
+            <div class="field-group" style="margin-bottom:0">
+              <label class="lbl" style="font-size:.6rem;margin-bottom:5px">Atelier IL</label>
+              <input class="inp" id="f-atelier-il" type="text" placeholder="optionnel" autocomplete="off"/>
+            </div>
           </div>
         </div>
       </div>
@@ -656,6 +721,17 @@ function parseQR(raw) {
     if (eq === -1) return;
     pairs[seg.slice(0, eq).trim().toUpperCase()] = seg.slice(eq + 1).trim();
   });
+
+  // Entrée : accepte IS2 (REV/ATELIER) OU IS3 (DATE_IS3/ATELIER_IS3)
+  // Normaliser vers REV/ATELIER pour le formulaire, stocker le type
+  if (!pairs['REV'] && pairs['DATE_IS3']) {
+    pairs['REV']     = pairs['DATE_IS3'];
+    pairs['ATELIER'] = pairs['ATELIER_IS3'] || '';
+    pairs['_REV_TYPE'] = 'IS3';
+  } else if (pairs['REV']) {
+    pairs['_REV_TYPE'] = 'IS2';
+  }
+
   const REQUIRED = ['SN','TYPE','TONNAGE','OWNER','REV','ATELIER'];
   const missing = REQUIRED.filter(k => !pairs[k]);
   return { pairs, missing };
@@ -787,12 +863,36 @@ function showFormZone(pairs, missing) {
   document.getElementById('zone-scanner').style.display = 'none';
   document.getElementById('zone-form').style.display    = 'block';
 
+  // Champs communs
   document.getElementById('f-sn').value      = pairs['SN']      || '';
   document.getElementById('f-type').value    = pairs['TYPE']    || '';
   document.getElementById('f-tonnage').value = pairs['TONNAGE'] || '';
   document.getElementById('f-owner').value   = pairs['OWNER']   || '';
   document.getElementById('f-rev').value     = pairs['REV']     || '';
   document.getElementById('f-atelier').value = pairs['ATELIER'] || '';
+
+  // Afficher le type de révision (IS2 ou IS3) dans le label
+  const revType = pairs['_REV_TYPE'] || (state.controlType === 'entree' ? 'IS2' : 'IS2');
+  const revLabel = document.getElementById('lbl-rev');
+  if (revLabel) revLabel.textContent = 'Date ' + revType;
+  const atelierLabel = document.getElementById('lbl-atelier');
+  if (atelierLabel) atelierLabel.textContent = 'Atelier ' + revType;
+
+  // Champs sortie uniquement
+  const isSortie = state.controlType === 'sortie';
+  const sortieBlock = document.getElementById('f-sortie-block');
+  if (sortieBlock) sortieBlock.style.display = isSortie ? 'block' : 'none';
+
+  if (isSortie) {
+    document.getElementById('f-date-is3').value     = pairs['DATE_IS3']     || '';
+    document.getElementById('f-atelier-is3').value  = pairs['ATELIER_IS3']  || '';
+    document.getElementById('f-date-is2').value     = pairs['DATE_IS2'] || pairs['REV'] || '';
+    document.getElementById('f-atelier-is2').value  = pairs['ATELIER_IS2'] || pairs['ATELIER'] || '';
+    document.getElementById('f-date-is1').value     = pairs['DATE_IS1']     || '';
+    document.getElementById('f-atelier-is1').value  = pairs['ATELIER_IS1']  || '';
+    document.getElementById('f-date-il').value      = pairs['DATE_IL']      || '';
+    document.getElementById('f-atelier-il').value   = pairs['ATELIER_IL']   || '';
+  }
 
   const errDiv = document.getElementById('parse-error');
   if (missing.length > 0) {
@@ -1011,7 +1111,11 @@ function rescan() {
 }
 
 function enterManual() {
-  showFormZone({ SN:'', TYPE:'', TONNAGE:'', OWNER:'', REV:'', ATELIER:'' }, []);
+  showFormZone({
+    SN:'', TYPE:'', TONNAGE:'', OWNER:'', REV:'', ATELIER:'',
+    DATE_IS3:'', ATELIER_IS3:'', DATE_IS2:'', ATELIER_IS2:'',
+    DATE_IS1:'', ATELIER_IS1:'', DATE_IL:'', ATELIER_IL:''
+  }, []);
   document.getElementById('parse-error').style.display = 'none';
 }
 
@@ -1030,10 +1134,22 @@ function saveEssieu() {
 
   const empty = Object.entries(fields)
     .filter(([,v]) => !v)
-    .map(([k]) => ({sn:'N° série',type:'Type',tonnage:'Tonnage',detenteur:'Détenteur',date_revision:'Date révision',atelier:'Atelier'}[k]));
+    .map(([k]) => ({sn:'N° série',type:'Type',tonnage:'Tonnage',detenteur:'Détenteur',date_revision:'Date révision',atelier:'Atelier IS2/IS3'}[k]));
 
   if (empty.length) {
     toast('Champs vides : ' + empty.join(', '), 'error'); return;
+  }
+
+  // Champs optionnels sortie
+  if (state.controlType === 'sortie') {
+    fields.date_is3    = document.getElementById('f-date-is3').value.trim();
+    fields.atelier_is3 = document.getElementById('f-atelier-is3').value.trim();
+    fields.date_is2    = document.getElementById('f-date-is2').value.trim();
+    fields.atelier_is2 = document.getElementById('f-atelier-is2').value.trim();
+    fields.date_is1    = document.getElementById('f-date-is1').value.trim();
+    fields.atelier_is1 = document.getElementById('f-atelier-is1').value.trim();
+    fields.date_il     = document.getElementById('f-date-il').value.trim();
+    fields.atelier_il  = document.getElementById('f-atelier-il').value.trim();
   }
 
   addRecord({
@@ -1090,7 +1206,14 @@ function renderHistItem(r) {
       <div class="dcell"><div class="dcell-lbl">Détenteur</div><div class="dcell-val">${r.detenteur||'—'}</div></div>
       <div class="dcell"><div class="dcell-lbl">Atelier</div><div class="dcell-val">${r.atelier||'—'}</div></div>
     </div>
-    ${r.date_revision ? `<div style="margin-top:6px;font-size:.7rem;color:var(--t3)">Révision : ${r.date_revision}</div>` : ''}
+    ${r.date_revision ? `<div style="margin-top:6px;font-size:.7rem;color:var(--t3)">Révision : ${r.date_revision}${r.atelier ? ' — ' + r.atelier : ''}</div>` : ''}
+    ${r.control_type === 'sortie' ? `
+      <div style="margin-top:4px;font-size:.68rem;color:var(--t3);line-height:1.7">
+        ${r.date_is3    ? `<span style="margin-right:8px">IS3 : ${r.date_is3}${r.atelier_is3 ? ' / '+r.atelier_is3 : ''}</span>` : ''}
+        ${r.date_is2    ? `<span style="margin-right:8px">IS2 : ${r.date_is2}${r.atelier_is2 ? ' / '+r.atelier_is2 : ''}</span>` : ''}
+        ${r.date_is1    ? `<span style="margin-right:8px">IS1 : ${r.date_is1}${r.atelier_is1 ? ' / '+r.atelier_is1 : ''}</span>` : ''}
+        ${r.date_il     ? `<span>IL : ${r.date_il}${r.atelier_il ? ' / '+r.atelier_il : ''}</span>` : ''}
+      </div>` : ''}
     <div style="margin-top:4px;font-size:.68rem;color:var(--t4)">${r.wagon} · ${new Date(r.created_at).toLocaleString('fr-FR')}</div>
   </div>`;
 }
@@ -1225,12 +1348,18 @@ const FIELD_ROWS = {
     atelier:       18,  // Atelier IS2
   },
   sortie: {
-    sn:            33,  // Numéro d'essieu (section sortie)
+    sn:            33,  // Numéro d'essieu
     type:          34,  // Type de construction
-    tonnage:       34,  // Tonnage (colonne +1)
+    tonnage:       34,  // Tonnage (colonne +1 : I/K/M/O)
     detenteur:     35,  // Détenteur
-    date_revision: 40,  // Date IS2
-    atelier:       41,  // Atelier IS2
+    date_is3:      40,  // Date IS3
+    atelier_is3:   41,  // Atelier IS3
+    date_is2:      42,  // Date IS2
+    atelier_is2:   43,  // Atelier IS2
+    date_is1:      44,  // Date IS1
+    atelier_is1:   45,  // Atelier IS1
+    date_il:       46,  // Date IL
+    atelier_il:    47,  // Atelier IL
   },
 };
 
@@ -1489,6 +1618,7 @@ async function buildXLSXBlob(mode) {
 
   // Données essieux — selon entrée ou sortie
   const fRows = FIELD_ROWS[rows[0]?.control_type || 'entree'];
+  const isSortie = (rows[0]?.control_type === 'sortie');
   rows.forEach(r => {
     const col  = ESSIEU_COLS[r.essieu_index];         // H, J, L, N
     const colT = ESSIEU_COLS_TONNAGE[r.essieu_index]; // I, K, M, O
@@ -1496,12 +1626,25 @@ async function buildXLSXBlob(mode) {
     const set = (row, val, c = col) => {
       if (val != null && val !== '') xml = injectCell(xml, `${c}${row}`, val);
     };
-    set(fRows.sn,            r.sn);
-    set(fRows.type,          r.type);
-    set(fRows.tonnage,       r.tonnage, colT); // tonnage → colonne I/K/M/O
-    set(fRows.detenteur,     r.detenteur);
-    set(fRows.date_revision, r.date_revision);
-    set(fRows.atelier,       r.atelier);
+    set(fRows.sn,        r.sn);
+    set(fRows.type,      r.type);
+    set(fRows.tonnage,   r.tonnage, colT);
+    set(fRows.detenteur, r.detenteur);
+    if (!isSortie) {
+      // Entrée : date_revision/atelier = IS2 ou IS3 selon QR
+      set(fRows.date_revision, r.date_revision);
+      set(fRows.atelier,       r.atelier);
+    } else {
+      // Sortie : champs IS3/IS2/IS1/IL séparés
+      set(fRows.date_is3,    r.date_is3);
+      set(fRows.atelier_is3, r.atelier_is3);
+      set(fRows.date_is2,    r.date_is2    || r.date_revision);
+      set(fRows.atelier_is2, r.atelier_is2 || r.atelier);
+      set(fRows.date_is1,    r.date_is1);
+      set(fRows.atelier_is1, r.atelier_is1);
+      set(fRows.date_il,     r.date_il);
+      set(fRows.atelier_il,  r.atelier_il);
+    }
   });
 
   // Mettre à jour sheet1.xml et sharedStrings.xml dans le ZIP natif
